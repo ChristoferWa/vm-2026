@@ -1,0 +1,10 @@
+@inject NavigationManager Navigation
+
+<MudProgressCircular Indeterminate="true" />
+
+@code {
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender) Navigation.NavigateTo("/login");
+    }
+}

@@ -1,0 +1,151 @@
+﻿@page "/admin"
+@rendermode InteractiveServer
+@inject CurrentUserService CurrentUser
+@inject AdminService AdminService
+@inject PredictionService PredictionService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Admin</PageTitle>
+
+@if (_user is null)
+{
+    <LoginRedirect />
+}
+else if (!_user.IsAdmin)
+{
+    <div class="glass-card panel">
+        <h1>Access denied</h1>
+        <p>You do not have access to this page.</p>
+    </div>
+}
+else
+{
+    <div class="page-header">
+        <div>
+            <h1>Admin</h1>
+            <p>Manage predictions and match results.</p>
+        </div>
+    </div>
+
+    <section class="glass-card panel">
+        <h2>Predictions</h2>
+
+        @if (_settings is not null)
+        {
+            <MudAlert Severity="@(_settings.PredictionsLocked? Severity.Warning: Severity.Success)">
+                Predictions are currently <strong>@(_settings.PredictionsLocked ? "locked" : "open")</strong>.
+            </MudAlert>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="@(_settings.PredictionsLocked ? Color.Success : Color.Warning)"
+                       Disabled="_isUpdatingLock"
+                       Class="mt-4"
+                       OnClick="TogglePredictionsLock">
+                @(_settings.PredictionsLocked ? "Unlock predictions" : "Lock predictions")
+            </MudButton>
+        }
+    </section>
+
+    <section class="glass-card panel" style="margin-top: 18px;">
+        <h2>Results</h2>
+
+        @foreach (var match in _matches)
+        {
+            <div class="admin-result-row">
+                <div>
+                    <small>@match.KickoffUtc.ToLocalTime().ToString("MMM d, HH:mm")</small>
+                    <strong>
+                        @match.HomeTeam.FlagEmoji @match.HomeTeam.Name
+                        vs
+                        @match.AwayTeam.FlagEmoji @match.AwayTeam.Name
+                    </strong>
+                </div>
+
+                <MudNumericField T="int?"
+                                 Value="_resultHomeGoals[match.Id]"
+                                 ValueChanged="value => _resultHomeGoals[match.Id] = value"
+                                 Min="0"
+                                 Max="30"
+                                 Variant="Variant.Outlined"
+                                 HideSpinButtons="true"
+                                 Class="score-input" />
+
+                <span>-</span>
+
+                <MudNumericField T="int?"
+                                 Value="_resultAwayGoals[match.Id]"
+                                 ValueChanged="value => _resultAwayGoals[match.Id] = value"
+                                 Min="0"
+                                 Max="30"
+                                 Variant="Variant.Outlined"
+                                 HideSpinButtons="true"
+                                 Class="score-input" />
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           OnClick="() => SaveResult(match.Id)">
+                    Save
+                </MudButton>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private Participant? _user;
+    private AppSettings? _settings;
+    private bool _isUpdatingLock;
+    private List<Match> _matches = new();
+    private Dictionary<int, int?> _resultHomeGoals = new();
+    private Dictionary<int, int?> _resultAwayGoals = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        _user = await CurrentUser.GetCurrentUserAsync();
+
+        if (_user is null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        _settings = await AdminService.GetSettingsAsync();
+        _matches = await PredictionService.GetMatchesForResultAdminAsync();
+
+        foreach (var match in _matches)
+        {
+            _resultHomeGoals[match.Id] = match.HomeGoals;
+            _resultAwayGoals[match.Id] = match.AwayGoals;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task TogglePredictionsLock()
+    {
+        if (_settings is null)
+            return;
+
+        _isUpdatingLock = true;
+
+        var newValue = !_settings.PredictionsLocked;
+        await AdminService.SetPredictionsLockedAsync(newValue);
+
+        _settings.PredictionsLocked = newValue;
+        _isUpdatingLock = false;
+    }
+
+    private async Task SaveResult(int matchId)
+    {
+        await PredictionService.SaveResultAsync(
+            matchId,
+            _resultHomeGoals[matchId],
+            _resultAwayGoals[matchId]);
+
+        Snackbar.Add("Result saved", Severity.Success);
+    }
+}

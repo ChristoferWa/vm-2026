@@ -1,0 +1,399 @@
+@page "/matches"
+@page "/matches/{MatchId:int?}"
+@rendermode InteractiveServer
+@inject CurrentUserService CurrentUser
+@inject PredictionService PredictionService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Matches</PageTitle>
+
+@if (_user is null)
+{
+    <LoginRedirect />
+}
+else if (SelectedMatch is not null)
+{
+    <a class="back-link" href="/matches">← Match</a>
+    <section class="glass-card panel match-detail">
+        <div class="versus">
+            <div><span class="flag-large">@SelectedMatch.HomeTeam.FlagEmoji</span><h2>@SelectedMatch.HomeTeam.Name</h2></div>
+            <div><small>@SelectedMatch.KickoffUtc.ToLocalTime().ToString("MMM d, HH:mm")</small><strong>vs</strong><small>@SelectedMatch.GroupName</small></div>
+            <div><span class="flag-large">@SelectedMatch.AwayTeam.FlagEmoji</span><h2>@SelectedMatch.AwayTeam.Name</h2></div>
+        </div>
+        <div class="score-cards">
+            <div class="score-card"><h3>Your prediction</h3><strong>@PredictionText(SelectedMatch)</strong></div>
+            <div class="score-card"><h3>Result</h3><strong>@ResultText(SelectedMatch)</strong></div>
+        </div>
+        <div class="score-card">
+            <h3>Prediction summary</h3>
+
+            <div>🏠 Home win: @HomeWinCount(SelectedMatch)</div>
+            <div>🤝 Draw: @DrawCount(SelectedMatch)</div>
+            <div>✈️ Away win: @AwayWinCount(SelectedMatch)</div>
+            @if (!string.IsNullOrWhiteSpace(MostPredictedResult(SelectedMatch)))
+            {
+                <div>
+                    Most predicted score: @MostPredictedResult(SelectedMatch)
+                </div>
+                <small>
+                    @MostPredictedPlayers(SelectedMatch)
+                </small>
+            }
+           @*  @if (PredictedScoreGroups(SelectedMatch).Any())
+            {
+                <div style="margin-top: 10px;">
+                    <small>Score distribution</small>
+
+                    @foreach (var group in PredictedScoreGroups(SelectedMatch))
+                    {
+                        <div>
+                            @group.Score: @group.Count players
+                        </div>
+                    }
+                </div>
+            } *@
+        </div>
+        <div class="score-card">
+            <h3>All predictions</h3>
+
+            <MudTable Items="ParticipantsWithPredictions(SelectedMatch)" Dense="true" Hover="true" Elevation="0">
+                <HeaderContent>
+                    <MudTh>Player</MudTh>
+                    <MudTh>Prediction</MudTh>
+                    <MudTh>Points</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>
+                        <span class="@(context.Id == _user.Id ? "gold-text" : string.Empty)">
+                            @context.DisplayName
+                        </span>
+                    </MudTd>
+                    <MudTd>
+                        <span class="@(context.Id == _user.Id ? "gold-text" : string.Empty)">
+                            @PredictionText(SelectedMatch, context.Id)
+                        </span>
+                    </MudTd>
+                    <MudTd>
+                        <span class="@(context.Id == _user.Id ? "gold-text" : string.Empty)">
+                            @PredictionPointsText(SelectedMatch, context.Id)
+                        </span>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+
+            @if (MissingPredictionCount(SelectedMatch) > 0)
+            {
+                <small>
+                    @MissingPredictionCount(SelectedMatch) participants have not submitted yet
+                </small>
+            }
+        </div>
+        @if (_user.IsAdmin)
+        {
+            <div class="admin-result-card">
+                <h3>Admin: update result</h3>
+
+                <div class="admin-result-form">
+                    <MudNumericField T="int?"
+                                     @bind-Value="_resultHomeGoals"
+                                     Label="@SelectedMatch.HomeTeam.Name"
+                                     Min="0"
+                                     Max="30"
+                                     Variant="Variant.Outlined"
+                                     HideSpinButtons="true"
+                                     Class="score-input" />
+
+                    <span>-</span>
+
+                    <MudNumericField T="int?"
+                                     @bind-Value="_resultAwayGoals"
+                                     Label="@SelectedMatch.AwayTeam.Name"
+                                     Min="0"
+                                     Max="30"
+                                     Variant="Variant.Outlined"
+                                     HideSpinButtons="true"
+                                     Class="score-input" />
+
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               OnClick="SaveResult">
+                        Save result
+                    </MudButton>
+                </div>
+            </div>
+        }
+    </section>
+}
+else
+{
+    <div class="page-header">
+        <h1>Matches</h1>
+    </div>
+
+    @if (_todaysMatches.Any())
+    {
+        <section class="glass-card panel">
+            <h2>Today's Matches</h2>
+
+            @foreach (var match in _todaysMatches)
+            {
+                <div class="score-card">
+                    <a class="back-link" href="/matches/@match.Id">
+                        <strong>
+                            @match.HomeTeam.FlagEmoji @match.HomeTeam.Name
+                            vs
+                            @match.AwayTeam.FlagEmoji @match.AwayTeam.Name
+                        </strong>
+                    </a>
+
+                    <div>
+                        @match.KickoffUtc.ToLocalTime().ToString("HH:mm")
+                    </div>
+                    <small>
+                        @SubmittedCount(match) / @_participants.Count submitted
+                    </small>
+                    @if (!string.IsNullOrWhiteSpace(MostPredictedResult(match)))
+                    {
+                        <div>
+                            <small>
+                                Most predicted: @MostPredictedResult(match)
+                            </small>
+                        </div>
+                    }
+                    <MudExpansionPanels Elevation="0">
+                        <MudExpansionPanel Text="Show predictions">
+                            <MudTable Items="ParticipantsWithPredictions(match)" Dense="true" Hover="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Player</MudTh>
+                            <MudTh>Prediction</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>
+                                <span class="@(context.Id == _user.Id ? "gold-text" : string.Empty)">
+                                    @context.DisplayName
+                                </span>
+                            </MudTd>
+                            <MudTd>
+                                <span class="@(context.Id == _user.Id ? "gold-text" : string.Empty)">
+                                    @PredictionText(match, context.Id)
+                                </span>
+                            </MudTd>
+                        </RowTemplate>
+                            </MudTable>
+                            @if (MissingPredictionCount(match) > 0)
+                            {
+                                <small>
+                                    @MissingPredictionCount(match) participants have not submitted yet
+                                </small>
+                            }
+                        </MudExpansionPanel>
+                    </MudExpansionPanels>
+                </div>
+            }
+        </section>
+    }
+
+    <section class="glass-card panel">
+        @foreach (var match in _matches)
+        {
+            <a class="match-row" href="/matches/@match.Id">
+                <span>@match.KickoffUtc.ToLocalTime().ToString("MMM d, HH:mm")</span>
+                <strong>@match.HomeTeam.FlagEmoji @match.HomeTeam.Name</strong>
+                <span>@ResultText(match)</span>
+                <strong>@match.AwayTeam.FlagEmoji @match.AwayTeam.Name</strong>
+            </a>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public int? MatchId { get; set; }
+    private Participant? _user;
+    private List<Match> _matches = new();
+    private List<Match> _todaysMatches = new();
+    private List<Participant> _participants = new();
+    private int? _resultHomeGoals;
+    private int? _resultAwayGoals;
+    private Match? _selectedMatchWithAllPredictions;
+    private Match? SelectedMatch => MatchId is null
+     ? null
+     : _selectedMatchWithAllPredictions
+         ?? _todaysMatches.FirstOrDefault(x => x.Id == MatchId.Value)
+         ?? _matches.FirstOrDefault(x => x.Id == MatchId.Value);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _user = await CurrentUser.GetCurrentUserAsync();
+        if (_user is null) { Navigation.NavigateTo("/login"); return; }
+        _matches = await PredictionService.GetMatchesWithPredictionsAsync(_user.Id);
+        _todaysMatches = await PredictionService.GetTodaysMatchesWithAllPredictionsAsync();
+        _participants = await PredictionService.GetParticipantsAsync();
+        if (MatchId is not null)
+        {
+            _selectedMatchWithAllPredictions = await PredictionService.GetMatchWithAllPredictionsAsync(MatchId.Value);
+        }
+        LoadSelectedMatchResult();
+        StateHasChanged();
+    }
+
+    private static string ResultText(Match match) => match.HomeGoals is null || match.AwayGoals is null ? "-" : $"{match.HomeGoals} - {match.AwayGoals}";
+    private string PredictionText(Match match)
+    {
+        if (_user is null)
+            return "No prediction";
+
+        return PredictionText(match, _user.Id);
+    }
+    private static string PredictionText(Match match, int participantId)
+    {
+        var prediction = match.Predictions.FirstOrDefault(x => x.ParticipantId == participantId);
+
+        return prediction?.HomeGoals is null || prediction?.AwayGoals is null
+            ? "-"
+            : $"{prediction.HomeGoals} - {prediction.AwayGoals}";
+    }
+    private void LoadSelectedMatchResult()
+    {
+        if (SelectedMatch is null)
+            return;
+
+        _resultHomeGoals = SelectedMatch.HomeGoals;
+        _resultAwayGoals = SelectedMatch.AwayGoals;
+    }
+
+    private async Task SaveResult()
+    {
+        if (_user?.IsAdmin != true || SelectedMatch is null)
+            return;
+
+        try
+        {
+            await PredictionService.SaveResultAsync(
+                SelectedMatch.Id,
+                _resultHomeGoals,
+                _resultAwayGoals);
+
+            _matches = await PredictionService.GetMatchesWithPredictionsAsync(_user.Id);
+            _todaysMatches = await PredictionService.GetTodaysMatchesWithAllPredictionsAsync();
+            LoadSelectedMatchResult();
+
+            Snackbar.Add("Result saved", Severity.Success);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+    private static int SubmittedCount(Match match)
+    {
+        return match.Predictions.Count(x => x.HomeGoals is not null && x.AwayGoals is not null);
+    }
+    private static string? MostPredictedResult(Match? match)
+    {
+        if (match is null)
+            return null;
+
+        var winner = match.Predictions
+            .Where(x => x.HomeGoals is not null && x.AwayGoals is not null)
+            .GroupBy(x => $"{x.HomeGoals}-{x.AwayGoals}")
+            .OrderByDescending(x => x.Count())
+            .FirstOrDefault();
+
+        if (winner is null)
+            return null;
+
+        return $"{winner.Key} ({winner.Count()} players)";
+    }
+    private static string MostPredictedPlayers(Match? match)
+    {
+        if (match is null)
+            return string.Empty;
+
+        var winner = match.Predictions
+            .Where(x => x.HomeGoals is not null && x.AwayGoals is not null)
+            .GroupBy(x => $"{x.HomeGoals}-{x.AwayGoals}")
+            .OrderByDescending(x => x.Count())
+            .FirstOrDefault();
+
+        if (winner is null)
+            return string.Empty;
+
+        return string.Join(", ", winner
+            .Select(x => x.Participant.DisplayName)
+            .OrderBy(x => x));
+    }
+    private static IEnumerable<(string Score, int Count)> PredictedScoreGroups(Match? match)
+    {
+        if (match is null)
+            return [];
+
+        return match.Predictions
+            .Where(x => x.HomeGoals is not null && x.AwayGoals is not null)
+            .GroupBy(x => $"{x.HomeGoals}-{x.AwayGoals}")
+            .OrderByDescending(x => x.Count())
+            .ThenBy(x => x.Key)
+            .Select(x => (x.Key, x.Count()));
+    }
+    private IEnumerable<Participant> ParticipantsWithPredictions(Match match)
+    {
+        return _participants
+            .Where(participant => match.Predictions.Any(prediction =>
+                prediction.ParticipantId == participant.Id &&
+                prediction.HomeGoals is not null &&
+                prediction.AwayGoals is not null))
+            .OrderBy(participant => participant.DisplayName);
+    }
+    private int MissingPredictionCount(Match match)
+    {
+        return _participants.Count - SubmittedCount(match);
+    }
+    private static int HomeWinCount(Match? match)
+    {
+        if (match is null)
+            return 0;
+
+        return match.Predictions.Count(x =>
+            x.HomeGoals is not null &&
+            x.AwayGoals is not null &&
+            x.HomeGoals > x.AwayGoals);
+    }
+
+    private static int DrawCount(Match? match)
+    {
+        if (match is null)
+            return 0;
+
+        return match.Predictions.Count(x =>
+            x.HomeGoals is not null &&
+            x.AwayGoals is not null &&
+            x.HomeGoals == x.AwayGoals);
+    }
+
+    private static int AwayWinCount(Match? match)
+    {
+        if (match is null)
+            return 0;
+
+        return match.Predictions.Count(x =>
+            x.HomeGoals is not null &&
+            x.AwayGoals is not null &&
+            x.HomeGoals < x.AwayGoals);
+    }
+    private static string PredictionPointsText(Match? match, int participantId)
+    {
+        if (match is null)
+            return "-";
+
+        var prediction = match.Predictions.FirstOrDefault(x => x.ParticipantId == participantId);
+
+        if (prediction is null)
+            return "-";
+
+        var points = LeaderboardService.CalculatePredictionPoints(prediction, match);
+
+        return match.Status == MatchStatus.Finished ? $"+{points}" : "-";
+    }
+}

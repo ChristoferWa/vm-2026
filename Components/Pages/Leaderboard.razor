@@ -1,0 +1,79 @@
+@page "/leaderboard"
+@rendermode InteractiveServer
+@inject CurrentUserService CurrentUser
+@inject LeaderboardService LeaderboardService
+@inject NavigationManager Navigation
+
+<PageTitle>Leaderboard</PageTitle>
+
+@if (_rows.Count == 0)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <div class="page-header">
+        <div>
+            <h1>Leaderboard</h1>
+            <p>Current standings based on finished matches.</p>
+        </div>
+    </div>
+
+    <div class="podium-grid">
+        @foreach (var row in _rows.Take(3))
+        {
+            <div class="podium-card glass-card @(row.IsCurrentUser ? "current-user-card" : string.Empty)">
+                <div class="podium-rank">#@row.Rank</div>
+                <h2>@row.ParticipantName</h2>
+                <strong>@row.Points pts</strong>
+                <small>@row.CorrectScore exact scores · @row.CorrectOutcome outcomes</small>
+            </div>
+        }
+    </div>
+
+    <section class="glass-card panel">
+        <MudTable Items="_rows" Hover="true" Elevation="0">
+            <HeaderContent>
+                <MudTh>#</MudTh>
+                <MudTh>Player</MudTh>
+                <MudTh>Points</MudTh>
+                <MudTh>Exact score</MudTh>
+                <MudTh>Outcome</MudTh>
+                <MudTh>Submitted</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Rank</MudTd>
+                <MudTd>
+                    <span class="@(context.IsCurrentUser ? "gold-text" : string.Empty)">
+                        @context.ParticipantName
+                    </span>
+                </MudTd>
+                <MudTd><strong>@context.Points</strong></MudTd>
+                <MudTd>@context.CorrectScore</MudTd>
+                <MudTd>@context.CorrectOutcome</MudTd>
+                <MudTd>@context.PredictionsSubmitted</MudTd>
+            </RowTemplate>
+        </MudTable>
+    </section>
+}
+
+@code {
+    private List<LeaderboardRow> _rows = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        var user = await CurrentUser.GetCurrentUserAsync();
+
+        if (user is null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        _rows = await LeaderboardService.GetLeaderboardAsync(user.Id);
+        StateHasChanged();
+    }
+}

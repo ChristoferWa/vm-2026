@@ -1,0 +1,45 @@
+@page "/login"
+@rendermode InteractiveServer
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<div class="login-page glass-card stadium-bg">
+    <div class="login-panel">
+        <div class="big-trophy">🏆</div>
+        <h1>WORLD CUP<br />PREDICTOR</h1>
+        <p>Enter your access code to login</p>
+
+        <MudTextField @bind-Value="_code"
+                      Placeholder="Enter access code"
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.End"
+                      AdornmentIcon="@Icons.Material.Filled.Key" />
+        <MudButton FullWidth="true" Variant="Variant.Filled" Color="Color.Primary" Class="mt-4" OnClick="HandleLogin">LOG IN</MudButton>
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-4">@_error</MudAlert>
+        }
+
+        <p class="hint">Try seed code: <strong>CHRIS</strong></p>
+    </div>
+</div>
+
+@code {
+    private string _code = string.Empty;
+    private string? _error;
+
+    private async Task HandleLogin()
+    {
+        var user = await CurrentUser.LoginWithCodeAsync(_code);
+        if (user is null)
+        {
+            _error = "Invalid access code.";
+            return;
+        }
+
+        Snackbar.Add($"Welcome, {user.DisplayName}!", Severity.Success);
+        Navigation.NavigateTo("/");
+    }
+}

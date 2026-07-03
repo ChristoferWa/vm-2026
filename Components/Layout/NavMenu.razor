@@ -1,0 +1,74 @@
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<aside class="side-nav glass-card">
+    <div class="brand">
+        <div class="trophy">🏆</div>
+        <div>
+            <strong>WORLD CUP</strong><br />
+            <span>PREDICTOR</span>
+        </div>
+    </div>
+
+    <MudNavMenu Dense="true" Class="nav-links">
+        <MudNavLink Href="/"
+                    Match="NavLinkMatch.All"
+                    ForceLoad="true"
+                    Icon="@Icons.Material.Filled.Dashboard">
+            Dashboard
+        </MudNavLink>
+
+        <MudNavLink Href="/predictions"
+                    Icon="@Icons.Material.Filled.SportsSoccer">
+            My Predictions
+        </MudNavLink>
+
+        <MudNavLink Href="/matches"
+                    Icon="@Icons.Material.Filled.CalendarMonth">
+            Matches
+        </MudNavLink>
+
+        <MudNavLink Href="/leaderboard"
+                    Icon="@Icons.Material.Filled.Leaderboard">
+            Leaderboard
+        </MudNavLink>
+
+        <MudNavLink Href="/rules"
+                    Icon="@Icons.Material.Filled.Info">
+            Rules
+        </MudNavLink>
+        @if (_user?.IsAdmin == true)
+        {
+            <MudNavLink Href="/admin"
+                        Icon="@Icons.Material.Filled.AdminPanelSettings">
+                Admin
+            </MudNavLink>
+        }
+    </MudNavMenu>
+
+    @if (_user is not null)
+    {
+        <div class="user-card">
+            <MudAvatar Color="Color.Primary">@_user.DisplayName[..1]</MudAvatar>
+            <div>
+                <strong>@_user.DisplayName</strong>
+                <button class="link-button" @onclick="Logout">Log out</button>
+            </div>
+        </div>
+    }
+</aside>
+
+@code {
+    private Participant? _user;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = await CurrentUser.GetCurrentUserAsync();
+    }
+
+    private async Task Logout()
+    {
+        await CurrentUser.LogoutAsync();
+        Navigation.NavigateTo("/login", forceLoad: true);
+    }
+}

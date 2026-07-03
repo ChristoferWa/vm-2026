@@ -1,0 +1,189 @@
+@page "/predictions"
+@rendermode InteractiveServer
+@inject CurrentUserService CurrentUser
+@inject PredictionService PredictionService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject AdminService AdminService
+
+<PageTitle>My Predictions</PageTitle>
+
+@if (_user is null)
+{
+    <LoginRedirect />
+}
+else
+{
+    <div class="page-header">
+        <div>
+            <h1>My Predictions</h1>
+            <p>Submit or update your match predictions.</p>
+        </div>
+    </div>
+
+    @if (_settings?.PredictionsLocked == true)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-4">
+            Predictions are currently locked by admin.
+        </MudAlert>
+    }
+
+    <div class="prediction-card-list">
+        @foreach (var match in _matches)
+        {
+            var prediction = match.Predictions.FirstOrDefault();
+            var locked = IsLocked(match);
+            var edit = _edits.GetValueOrDefault(match.Id);
+
+            <div class="prediction-card glass-card">
+                <div class="prediction-card-header">
+                    <span>@match.KickoffUtc.ToLocalTime().ToString("MMM d, HH:mm")</span>
+                    <MudChip T="string"
+                             Color="@(locked ? Color.Default : Color.Success)"
+                             Variant="Variant.Outlined"
+                             Size="Size.Small">
+                        @(locked ? "Locked" : "Open")
+                    </MudChip>
+
+                    <MudChip T="string"
+                             Color="@(prediction is null ? Color.Warning : Color.Info)"
+                             Variant="Variant.Outlined"
+                             Size="Size.Small">
+                        @(prediction is null ? "Not submitted" : "Submitted")
+                    </MudChip>
+                </div>
+
+                <div class="prediction-match">
+                    <div class="prediction-team">
+                        <div class="prediction-flag">@match.HomeTeam.FlagEmoji</div>
+                        <strong>@match.HomeTeam.Name</strong>
+                    </div>
+
+                    <div class="prediction-score">
+                        @if (edit is not null)
+                        {
+                            <MudNumericField T="int?"
+                                             @bind-Value="edit.HomeGoals"
+                                             Min="0"
+                                             Max="20"
+                                             Variant="Variant.Outlined"
+                                             Disabled="locked"
+                                             HideSpinButtons="true"
+                                             Class="score-input" />
+
+                            <span>-</span>
+
+                            <MudNumericField T="int?"
+                                             @bind-Value="edit.AwayGoals"
+                                             Min="0"
+                                             Max="20"
+                                             Variant="Variant.Outlined"
+                                             Disabled="locked"
+                                             HideSpinButtons="true"
+                                             Class="score-input" />
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       Disabled="locked"
+                                       Size="Size.Small"
+                                       OnClick="() => Save(match.Id)">
+                                Save
+                            </MudButton>
+                        }
+                    </div>
+
+                    <div class="prediction-team">
+                        <div class="prediction-flag">@match.AwayTeam.FlagEmoji</div>
+                        <strong>@match.AwayTeam.Name</strong>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private AppSettings? _settings;
+    private Participant? _user;
+    private List<Match> _matches = new();
+    private Dictionary<int, PredictionEditModel> _edits = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        _user = await CurrentUser.GetCurrentUserAsync();
+
+        if (_user is null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        _settings = await AdminService.GetSettingsAsync();
+        _matches = await PredictionService.GetMatchesWithPredictionsAsync(_user.Id);
+
+        BuildEditState();
+
+        StateHasChanged();
+    }
+
+    private bool IsLocked(Match match)
+    {
+        return _settings?.PredictionsLocked == true;
+    }
+    private void BuildEditState()
+    {
+        _edits = _matches.ToDictionary(
+            match => match.Id,
+            match =>
+            {
+                var prediction = match.Predictions.FirstOrDefault();
+
+                return new PredictionEditModel
+                {
+                    HomeGoals = prediction?.HomeGoals,
+                    AwayGoals = prediction?.AwayGoals
+                };
+            });
+    }
+
+    private async Task Save(int matchId)
+    {
+        if (_user is null)
+            return;
+
+        if (_settings?.PredictionsLocked == true)
+        {
+            Snackbar.Add("Predictions are locked.", Severity.Warning);
+            return;
+        }
+
+        if (!_edits.TryGetValue(matchId, out var edit))
+            return;
+
+        try
+        {
+            await PredictionService.SavePredictionAsync(
+                _user.Id,
+                matchId,
+                edit.HomeGoals,
+                edit.AwayGoals);
+
+            _matches = await PredictionService.GetMatchesWithPredictionsAsync(_user.Id);
+            BuildEditState();
+
+            Snackbar.Add("Prediction saved", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+    private sealed class PredictionEditModel
+    {
+        public int? HomeGoals { get; set; }
+        public int? AwayGoals { get; set; }
+    }
+}
