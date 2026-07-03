@@ -68,7 +68,7 @@ using (var scope = app.Services.CreateScope())
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     logger.LogInformation("Preparing database using provider {Provider}", databaseProvider);
-    db.Database.EnsureCreated();
+    db.Database.Migrate();
     var importFile = Path.Combine(app.Environment.ContentRootPath, "Data", "Import", "VmTipsImportModel.xlsx");
 
     if (!db.Participants.Any() && File.Exists(importFile))

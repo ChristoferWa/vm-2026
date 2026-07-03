@@ -11,8 +11,8 @@ using VmTips.Web.Data;
 namespace VmTips.Web.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260703202307_AddMatchNoToMatches")]
-    partial class AddMatchNoToMatches
+    [Migration("20260703210814_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
