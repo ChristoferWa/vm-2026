@@ -11,6 +11,21 @@
         <h1>WORLD CUP<br />PREDICTOR</h1>
         <p>Enter your access code to login</p>
 
+        @if (_currentUser is not null)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4">
+                Logged in as <strong>@_currentUser.DisplayName</strong>.
+            </MudAlert>
+
+            <MudButton FullWidth="true"
+                       Variant="Variant.Outlined"
+                       Color="Color.Secondary"
+                       Class="mb-4"
+                       OnClick="Logout">
+                LOG OUT
+            </MudButton>
+        }
+
         <MudTextField @bind-Value="_code"
                       Placeholder="Enter access code"
                       Variant="Variant.Outlined"
@@ -30,16 +45,15 @@
 @code {
     private string _code = string.Empty;
     private string? _error;
+    private Participant? _currentUser;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender)
             return;
 
-        var user = await CurrentUser.GetCurrentUserAsync();
-
-        if (user is not null)
-            Navigation.NavigateTo("/dashboard");
+        _currentUser = await CurrentUser.GetCurrentUserAsync();
+        StateHasChanged();
     }
 
     private async Task HandleLogin()
@@ -53,5 +67,13 @@
 
         Snackbar.Add($"Welcome, {user.DisplayName}!", Severity.Success);
         Navigation.NavigateTo("/dashboard");
+    }
+
+    private async Task Logout()
+    {
+        await CurrentUser.LogoutAsync();
+        _currentUser = null;
+        _code = string.Empty;
+        Snackbar.Add("Logged out", Severity.Success);
     }
 }

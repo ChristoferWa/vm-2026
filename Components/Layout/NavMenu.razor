@@ -61,9 +61,13 @@
 @code {
     private Participant? _user;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!firstRender)
+            return;
+
         _user = await CurrentUser.GetCurrentUserAsync();
+        StateHasChanged();
     }
 
     private async Task Logout()

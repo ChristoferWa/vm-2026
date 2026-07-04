@@ -48,6 +48,27 @@ else
     </section>
 
     <section class="glass-card panel" style="margin-top: 18px;">
+        <h2>Excel import</h2>
+
+        <div class="mt-4">
+            <InputFile OnChange="OnImportFileSelected" accept=".xlsx" />
+        </div>
+
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Primary"
+                   Disabled="@(_isImportingTips || _selectedImportFile is null)"
+                   Class="mt-4"
+                   OnClick="ImportTipsWorkbook">
+            @(_isImportingTips ? "Importing..." : "Import selected Excel")
+        </MudButton>
+
+        @if (!string.IsNullOrWhiteSpace(_lastImportMessage))
+        {
+            <p>@_lastImportMessage</p>
+        }
+    </section>
+
+    <section class="glass-card panel" style="margin-top: 18px;">
         <h2>Results</h2>
 
         @foreach (var match in _matches)
@@ -61,6 +82,20 @@ else
                         @match.AwayTeam.FlagEmoji @match.AwayTeam.Name
                     </strong>
                 </div>
+
+                <MudTextField T="string"
+                              Value="@KickoffText(match.Id)"
+                              ValueChanged="value => _kickoffTexts[match.Id] = value"
+                              Label="Kickoff"
+                              Placeholder="2026-06-18 21:00"
+                              Variant="Variant.Outlined"
+                              Class="kickoff-input" />
+
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           OnClick="() => SaveKickoff(match.Id)">
+                    Save time
+                </MudButton>
 
                 <MudNumericField T="int?"
                                  Value="_resultHomeGoals[match.Id]"
@@ -96,9 +131,13 @@ else
     private Participant? _user;
     private AppSettings? _settings;
     private bool _isUpdatingLock;
+    private bool _isImportingTips;
+    private string? _lastImportMessage;
+    private IBrowserFile? _selectedImportFile;
     private List<Match> _matches = new();
     private Dictionary<int, int?> _resultHomeGoals = new();
     private Dictionary<int, int?> _resultAwayGoals = new();
+    private Dictionary<int, string> _kickoffTexts = new();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -114,13 +153,7 @@ else
         }
 
         _settings = await AdminService.GetSettingsAsync();
-        _matches = await PredictionService.GetMatchesForResultAdminAsync();
-
-        foreach (var match in _matches)
-        {
-            _resultHomeGoals[match.Id] = match.HomeGoals;
-            _resultAwayGoals[match.Id] = match.AwayGoals;
-        }
+        await ReloadMatchesAsync();
 
         StateHasChanged();
     }
@@ -141,11 +174,108 @@ else
 
     private async Task SaveResult(int matchId)
     {
-        await PredictionService.SaveResultAsync(
-            matchId,
-            _resultHomeGoals[matchId],
-            _resultAwayGoals[matchId]);
+        try
+        {
+            await PredictionService.SaveResultAsync(
+                matchId,
+                _resultHomeGoals[matchId],
+                _resultAwayGoals[matchId]);
 
-        Snackbar.Add("Result saved", Severity.Success);
+            await ReloadMatchesAsync();
+
+            Snackbar.Add("Result saved", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task SaveKickoff(int matchId)
+    {
+        if (!_kickoffTexts.TryGetValue(matchId, out var kickoffText))
+            return;
+
+        if (!DateTime.TryParse(kickoffText, out var kickoffLocal))
+        {
+            Snackbar.Add("Invalid kickoff format. Use yyyy-MM-dd HH:mm", Severity.Error);
+            return;
+        }
+
+        try
+        {
+            await PredictionService.SaveKickoffAsync(matchId, kickoffLocal.ToUniversalTime());
+
+            await ReloadMatchesAsync();
+
+            Snackbar.Add("Kickoff saved", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private string KickoffText(int matchId)
+    {
+        return _kickoffTexts.TryGetValue(matchId, out var value)
+            ? value
+            : string.Empty;
+    }
+
+    private void OnImportFileSelected(InputFileChangeEventArgs args)
+    {
+        _selectedImportFile = args.File;
+        _lastImportMessage = $"Selected file: {_selectedImportFile.Name}";
+    }
+
+    private async Task ImportTipsWorkbook()
+    {
+        if (_selectedImportFile is null)
+        {
+            Snackbar.Add("Select an Excel file first.", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            _isImportingTips = true;
+            _lastImportMessage = $"Import started: {_selectedImportFile.Name}";
+            StateHasChanged();
+
+            await using var uploadStream = _selectedImportFile.OpenReadStream(20 * 1024 * 1024);
+            using var importStream = new MemoryStream();
+            await uploadStream.CopyToAsync(importStream);
+            importStream.Position = 0;
+
+            var importResult = await AdminService.ImportTipsWorkbookAsync(importStream);
+
+            await ReloadMatchesAsync();
+
+            _lastImportMessage = importResult.Summary;
+            Snackbar.Add("Tips imported from Excel", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            _lastImportMessage = $"Import failed: {ex.Message}";
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _isImportingTips = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ReloadMatchesAsync()
+    {
+        _matches = await PredictionService.GetMatchesForResultAdminAsync();
+
+        foreach (var match in _matches)
+        {
+            _resultHomeGoals[match.Id] = match.HomeGoals;
+            _resultAwayGoals[match.Id] = match.AwayGoals;
+            _kickoffTexts[match.Id] = match.KickoffUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+        }
     }
 }
