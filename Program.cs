@@ -25,7 +25,7 @@ builder.Services.AddScoped<PredictionService>();
 builder.Services.AddScoped<LeaderboardService>();
 builder.Services.AddScoped<AdminService>();
 
-var databaseProvider = builder.Configuration["Database:Provider"] ?? "Sqlite";
+var databaseProvider = builder.Configuration["Database:Provider"] ?? "Postgres";
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {

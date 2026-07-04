@@ -1,5 +1,6 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
@@ -15,9 +16,9 @@ namespace VmTips.Web.Migrations
                 name: "AppSettings",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    PredictionsLocked = table.Column<bool>(type: "INTEGER", nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    PredictionsLocked = table.Column<bool>(type: "boolean", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -28,11 +29,11 @@ namespace VmTips.Web.Migrations
                 name: "Participants",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    DisplayName = table.Column<string>(type: "TEXT", nullable: false),
-                    AccessCode = table.Column<string>(type: "TEXT", nullable: false),
-                    IsAdmin = table.Column<bool>(type: "INTEGER", nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    DisplayName = table.Column<string>(type: "text", nullable: false),
+                    AccessCode = table.Column<string>(type: "text", nullable: false),
+                    IsAdmin = table.Column<bool>(type: "boolean", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -43,11 +44,11 @@ namespace VmTips.Web.Migrations
                 name: "Teams",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    Name = table.Column<string>(type: "TEXT", nullable: false),
-                    Code = table.Column<string>(type: "TEXT", nullable: false),
-                    FlagEmoji = table.Column<string>(type: "TEXT", nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Name = table.Column<string>(type: "text", nullable: false),
+                    Code = table.Column<string>(type: "text", nullable: false),
+                    FlagEmoji = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -58,16 +59,16 @@ namespace VmTips.Web.Migrations
                 name: "Matches",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    MatchNo = table.Column<int>(type: "INTEGER", nullable: false),
-                    KickoffUtc = table.Column<DateTime>(type: "TEXT", nullable: false),
-                    GroupName = table.Column<string>(type: "TEXT", nullable: false),
-                    HomeTeamId = table.Column<int>(type: "INTEGER", nullable: false),
-                    AwayTeamId = table.Column<int>(type: "INTEGER", nullable: false),
-                    Status = table.Column<int>(type: "INTEGER", nullable: false),
-                    HomeGoals = table.Column<int>(type: "INTEGER", nullable: true),
-                    AwayGoals = table.Column<int>(type: "INTEGER", nullable: true)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    MatchNo = table.Column<int>(type: "integer", nullable: false),
+                    KickoffUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    GroupName = table.Column<string>(type: "text", nullable: false),
+                    HomeTeamId = table.Column<int>(type: "integer", nullable: false),
+                    AwayTeamId = table.Column<int>(type: "integer", nullable: false),
+                    Status = table.Column<int>(type: "integer", nullable: false),
+                    HomeGoals = table.Column<int>(type: "integer", nullable: true),
+                    AwayGoals = table.Column<int>(type: "integer", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -90,13 +91,13 @@ namespace VmTips.Web.Migrations
                 name: "Predictions",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    ParticipantId = table.Column<int>(type: "INTEGER", nullable: false),
-                    MatchId = table.Column<int>(type: "INTEGER", nullable: false),
-                    HomeGoals = table.Column<int>(type: "INTEGER", nullable: true),
-                    AwayGoals = table.Column<int>(type: "INTEGER", nullable: true),
-                    UpdatedAtUtc = table.Column<DateTime>(type: "TEXT", nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    ParticipantId = table.Column<int>(type: "integer", nullable: false),
+                    MatchId = table.Column<int>(type: "integer", nullable: false),
+                    HomeGoals = table.Column<int>(type: "integer", nullable: true),
+                    AwayGoals = table.Column<int>(type: "integer", nullable: true),
+                    UpdatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
