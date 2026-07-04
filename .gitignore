@@ -7,6 +7,8 @@ obj/
 *.suo
 
 appsettings.Development.json
+NuGet.Config
+.appdata/
 
 *.db
 *.db-shm
