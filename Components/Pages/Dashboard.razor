@@ -1,4 +1,4 @@
-@page "/"
+@page "/dashboard"
 @rendermode InteractiveServer
 @inject CurrentUserService CurrentUser
 @inject PredictionService Predictions
@@ -37,13 +37,17 @@ else
                 OnClick="TogglePredictionsLock">
                 @(_settings.PredictionsLocked ? "Unlock predictions" : "Lock predictions")
             </MudButton>
-          <MudButton Variant="Variant.Outlined"
-           Color="Color.Primary"
-           Disabled="_isImportingTips"
-           Class="mt-4"
-           OnClick="ImportTipsWorkbook">
-    @(_isImportingTips ? "Importing..." : "Import tips from Excel")
-</MudButton>
+            <div class="mt-4">
+                <InputFile OnChange="OnImportFileSelected" accept=".xlsx" />
+            </div>
+
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       Disabled="@(_isImportingTips || _selectedImportFile is null)"
+                       Class="mt-4"
+                       OnClick="ImportTipsWorkbook">
+                @(_isImportingTips ? "Importing..." : "Import selected Excel")
+            </MudButton>
 
 @if (!string.IsNullOrWhiteSpace(_lastImportMessage))
 {
@@ -169,6 +173,7 @@ else
     private bool _isUpdatingLock;
     private bool _isImportingTips;
     private string? _lastImportMessage;
+    private IBrowserFile? _selectedImportFile;
     private bool _showAdminResults;
     private Participant? _user;
     private List<Match> _matches = new();
@@ -279,19 +284,34 @@ private string KickoffText(int matchId)
         ? value
         : string.Empty;
 }
-   private async Task ImportTipsWorkbook()
+private void OnImportFileSelected(InputFileChangeEventArgs args)
 {
-    Snackbar.Add("Import button clicked", Severity.Info);
+    _selectedImportFile = args.File;
+    _lastImportMessage = $"Selected file: {_selectedImportFile.Name}";
+}
+
+private async Task ImportTipsWorkbook()
+{
+    if (_selectedImportFile is null)
+    {
+        Snackbar.Add("Select an Excel file first.", Severity.Warning);
+        return;
+    }
 
     try
     {
         _isImportingTips = true;
-        _lastImportMessage = "Import started...";
+        _lastImportMessage = $"Import started: {_selectedImportFile.Name}";
         StateHasChanged();
 
         await Task.Yield();
 
-        var importResult = await AdminService.ImportTipsWorkbookAsync();
+        await using var uploadStream = _selectedImportFile.OpenReadStream(20 * 1024 * 1024);
+        using var importStream = new MemoryStream();
+        await uploadStream.CopyToAsync(importStream);
+        importStream.Position = 0;
+
+        var importResult = await AdminService.ImportTipsWorkbookAsync(importStream);
 
         _matches = await Predictions.GetMatchesWithPredictionsAsync(_user!.Id);
         _leaderboard = await Leaderboard.GetLeaderboardAsync(_user.Id);

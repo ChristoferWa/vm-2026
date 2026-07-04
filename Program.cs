@@ -69,17 +69,7 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     logger.LogInformation("Preparing database using provider {Provider}", databaseProvider);
     db.Database.Migrate();
-    var importFile = Path.Combine(app.Environment.ContentRootPath, "Data", "Import", "VmTipsImportModel.xlsx");
-
-    if (!db.Participants.Any() && File.Exists(importFile))
-    {
-        var importer = scope.ServiceProvider.GetRequiredService<ExcelImportService>();
-        importer.Import(importFile);
-    }
-    else
-    {
-        SeedData.EnsureSeeded(db, logger);
-    }
+    SeedData.EnsureSeeded(db, logger);
 }
 
 app.MapRazorComponents<App>()

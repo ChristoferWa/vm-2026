@@ -1,4 +1,5 @@
 @page "/login"
+@page "/"
 @rendermode InteractiveServer
 @inject CurrentUserService CurrentUser
 @inject NavigationManager Navigation
@@ -30,6 +31,17 @@
     private string _code = string.Empty;
     private string? _error;
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        var user = await CurrentUser.GetCurrentUserAsync();
+
+        if (user is not null)
+            Navigation.NavigateTo("/dashboard");
+    }
+
     private async Task HandleLogin()
     {
         var user = await CurrentUser.LoginWithCodeAsync(_code);
@@ -40,6 +52,6 @@
         }
 
         Snackbar.Add($"Welcome, {user.DisplayName}!", Severity.Success);
-        Navigation.NavigateTo("/");
+        Navigation.NavigateTo("/dashboard");
     }
 }

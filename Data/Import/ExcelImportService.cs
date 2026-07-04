@@ -43,6 +43,18 @@ public sealed class ExcelImportService
 
         using var workbook = new XLWorkbook(filePath);
 
+        return ImportTipsWorkbook(workbook, filePath);
+    }
+
+    public ImportResult ImportTipsWorkbook(Stream fileStream)
+    {
+        using var workbook = new XLWorkbook(fileStream);
+
+        return ImportTipsWorkbook(workbook, "uploaded workbook");
+    }
+
+    private ImportResult ImportTipsWorkbook(XLWorkbook workbook, string sourceName)
+    {
         var result = new ImportResult();
 
         ImportTipsWorkbookResults(workbook, result);
@@ -50,14 +62,16 @@ public sealed class ExcelImportService
 
         _db.SaveChanges();
 
-        _logger.LogInformation("Tips workbook import completed from {FilePath}", filePath);
+        _logger.LogInformation("Tips workbook import completed from {SourceName}", sourceName);
 
         return result;
     }
+
     private void ImportTipsWorkbookResults(XLWorkbook workbook, ImportResult result)
     {
         var sheet = workbook.Worksheet("📊 Resultat & Tabell");
-        var tbdTeam = GetOrCreateTbdTeam();
+
+        RemoveSampleMatchesWithoutMatchNumbers();
 
         foreach (var row in sheet.RowsUsed().Skip(1))
         {
@@ -72,8 +86,8 @@ public sealed class ExcelImportService
             if (matchNo is null || string.IsNullOrWhiteSpace(homeTeamName) || string.IsNullOrWhiteSpace(awayTeamName))
                 continue;
 
-            var homeTeam = _db.Teams.FirstOrDefault(x => x.Name == homeTeamName) ?? tbdTeam;
-            var awayTeam = _db.Teams.FirstOrDefault(x => x.Name == awayTeamName) ?? tbdTeam;
+            var homeTeam = GetOrCreateTeam(homeTeamName);
+            var awayTeam = GetOrCreateTeam(awayTeamName);
 
             var match = _db.Matches.FirstOrDefault(x => x.MatchNo == matchNo.Value);
 
@@ -82,7 +96,7 @@ public sealed class ExcelImportService
                 match = new Match
                 {
                     MatchNo = matchNo.Value,
-                    GroupName = "Knockout",
+                    GroupName = ReadGroupName(row),
                     KickoffUtc = kickoffLocal?.ToUniversalTime() ?? DateTime.UtcNow,
                     HomeTeamId = homeTeam.Id,
                     AwayTeamId = awayTeam.Id,
@@ -95,6 +109,7 @@ public sealed class ExcelImportService
             {
                 match.HomeTeamId = homeTeam.Id;
                 match.AwayTeamId = awayTeam.Id;
+                match.GroupName = ReadGroupName(row);
             }
 
             if (kickoffLocal is not null)
@@ -495,18 +510,41 @@ public sealed class ExcelImportService
 
         return date.Value.Add(time ?? TimeSpan.Zero);
     }
-    private Team GetOrCreateTbdTeam()
+    private void RemoveSampleMatchesWithoutMatchNumbers()
     {
-        var team = _db.Teams.FirstOrDefault(x => x.Code == "TBD");
+        var sampleMatches = _db.Matches
+            .Where(x => x.MatchNo <= 0)
+            .ToList();
+
+        if (sampleMatches.Count == 0)
+            return;
+
+        var sampleMatchIds = sampleMatches.Select(x => x.Id).ToList();
+        var samplePredictions = _db.Predictions
+            .Where(x => sampleMatchIds.Contains(x.MatchId))
+            .ToList();
+
+        _db.Predictions.RemoveRange(samplePredictions);
+        _db.Matches.RemoveRange(sampleMatches);
+        _db.SaveChanges();
+    }
+
+    private Team GetOrCreateTeam(string teamName)
+    {
+        var normalizedName = NormalizeTeamName(teamName);
+
+        var team = _db.Teams
+            .AsEnumerable()
+            .FirstOrDefault(x => NormalizeTeamName(x.Name) == normalizedName);
 
         if (team is not null)
             return team;
 
         team = new Team
         {
-            Code = "TBD",
-            Name = "TBD",
-            FlagEmoji = "🏳️"
+            Code = CreateTeamCode(teamName),
+            Name = teamName.Trim(),
+            FlagEmoji = string.Empty
         };
 
         _db.Teams.Add(team);
@@ -514,6 +552,46 @@ public sealed class ExcelImportService
 
         return team;
     }
+
+    private static string ReadGroupName(IXLRow row)
+    {
+        var groupName = row.Cell(8).GetString().Trim();
+        var stageName = row.Cell(7).GetString().Trim();
+
+        return string.IsNullOrWhiteSpace(groupName)
+            ? stageName
+            : groupName;
+    }
+
+    private string CreateTeamCode(string teamName)
+    {
+        var normalized = NormalizeTeamName(teamName);
+        var baseCode = new string(normalized
+            .Where(char.IsLetterOrDigit)
+            .Take(3)
+            .ToArray())
+            .ToUpperInvariant();
+
+        if (string.IsNullOrWhiteSpace(baseCode))
+            baseCode = "TEAM";
+
+        var code = baseCode;
+        var suffix = 2;
+
+        while (_db.Teams.Any(x => x.Code == code))
+        {
+            code = $"{baseCode}{suffix}";
+            suffix++;
+        }
+
+        return code;
+    }
+
+    private static string NormalizeTeamName(string value)
+    {
+        return value.Trim().ToUpperInvariant();
+    }
+
     private static bool ReadBool(string value)
     {
         return value.Trim().ToLowerInvariant() switch

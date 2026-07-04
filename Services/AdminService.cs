@@ -46,24 +46,10 @@ public sealed class AdminService
 
         return settings.PredictionsLocked;
     }
-    public Task<ImportResult> ImportTipsWorkbookAsync()
+
+    public Task<ImportResult> ImportTipsWorkbookAsync(Stream fileStream)
     {
-        var filePath = Path.Combine(
-            AppContext.BaseDirectory,
-            "Data",
-            "Import",
-            "vm-tips-2026.xlsx");
-
-        if (!File.Exists(filePath))
-        {
-            filePath = Path.Combine(
-                Directory.GetCurrentDirectory(),
-                "Data",
-                "Import",
-                "vm-tips-2026.xlsx");
-        }
-
-        var result = _excelImportService.ImportTipsWorkbook(filePath);
+        var result = _excelImportService.ImportTipsWorkbook(fileStream);
 
         return Task.FromResult(result);
     }

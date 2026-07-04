@@ -1,12 +1,17 @@
 @inherits LayoutComponentBase
+@inject NavigationManager Navigation
 
 <MudThemeProvider Theme="_theme" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-<div class="app-shell">
-    <NavMenu />
+<div class="app-shell @(IsLoginPage ? "login-shell" : string.Empty)">
+    @if (!IsLoginPage)
+    {
+        <NavMenu />
+    }
+
     <main class="main-content">
         @Body
     </main>
@@ -27,4 +32,15 @@
             TextSecondary = "#A8B3C2"
         }
     };
+
+    private bool IsLoginPage
+    {
+        get
+        {
+            var path = new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/');
+
+            return string.IsNullOrEmpty(path) ||
+                path.Equals("/login", StringComparison.OrdinalIgnoreCase);
+        }
+    }
 }

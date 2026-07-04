@@ -34,11 +34,11 @@ public static class SeedData
         var kickoff = new DateTime(2026, 6, 10, 18, 0, 0, DateTimeKind.Utc);
 
         db.Matches.AddRange(
-            CreateMatch(kickoff, "Group A", byCode["BRA"], byCode["CRO"], MatchStatus.Finished, 2, 1),
-            CreateMatch(kickoff.AddHours(3), "Group A", byCode["ARG"], byCode["MEX"], MatchStatus.Finished, 3, 1),
-            CreateMatch(kickoff.AddDays(1), "Group B", byCode["FRA"], byCode["JPN"], MatchStatus.Finished, 1, 0),
-            CreateMatch(kickoff.AddDays(1).AddHours(3), "Group B", byCode["ESP"], byCode["GER"], MatchStatus.Scheduled),
-            CreateMatch(kickoff.AddDays(2).AddHours(3), "Group C", byCode["POR"], byCode["URU"], MatchStatus.Scheduled)
+            CreateMatch(1, kickoff, "Group A", byCode["BRA"], byCode["CRO"], MatchStatus.Finished, 2, 1),
+            CreateMatch(2, kickoff.AddHours(3), "Group A", byCode["ARG"], byCode["MEX"], MatchStatus.Finished, 3, 1),
+            CreateMatch(3, kickoff.AddDays(1), "Group B", byCode["FRA"], byCode["JPN"], MatchStatus.Finished, 1, 0),
+            CreateMatch(4, kickoff.AddDays(1).AddHours(3), "Group B", byCode["ESP"], byCode["GER"], MatchStatus.Scheduled),
+            CreateMatch(5, kickoff.AddDays(2).AddHours(3), "Group C", byCode["POR"], byCode["URU"], MatchStatus.Scheduled)
         );
 
         db.Participants.AddRange(
@@ -85,10 +85,11 @@ public static class SeedData
         }
     }
 
-    private static Match CreateMatch(DateTime kickoffUtc, string groupName, Team home, Team away, MatchStatus status, int? homeGoals = null, int? awayGoals = null)
+    private static Match CreateMatch(int matchNo, DateTime kickoffUtc, string groupName, Team home, Team away, MatchStatus status, int? homeGoals = null, int? awayGoals = null)
     {
         return new Match
         {
+            MatchNo = matchNo,
             KickoffUtc = kickoffUtc,
             GroupName = groupName,
             HomeTeamId = home.Id,

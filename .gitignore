@@ -9,6 +9,8 @@ obj/
 appsettings.Development.json
 NuGet.Config
 .appdata/
+~$*.xlsx
+Data/Import/*.xlsx
 
 *.db
 *.db-shm

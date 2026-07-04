@@ -1,24 +1,53 @@
 @page "/rules"
 @rendermode InteractiveServer
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
 
 <PageTitle>Rules</PageTitle>
 
-<div class="page-header"><h1>Rules</h1></div>
-<div class="rules-grid">
-    <section class="glass-card panel confetti-card">
-        <h2>Scoring system</h2>
-        <ul>
-            <li>Correct score: 5 points</li>
-            <li>Correct outcome: 2 points</li>
-            <li>Wrong prediction: 0 points</li>
-        </ul>
-    </section>
-    <section class="glass-card panel">
-        <h2>Other rules</h2>
-        <ul>
-            <li>You must submit your prediction before kick-off time.</li>
-            <li>Changes are allowed until the match starts.</li>
-            <li>In case of a tie, correct score predictions are prioritized.</li>
-        </ul>
-    </section>
-</div>
+@if (_user is null)
+{
+    <LoginRedirect />
+}
+else
+{
+    <div class="page-header"><h1>Rules</h1></div>
+    <div class="rules-grid">
+        <section class="glass-card panel confetti-card">
+            <h2>Scoring system</h2>
+            <ul>
+                <li>Correct score: 5 points</li>
+                <li>Correct outcome: 2 points</li>
+                <li>Wrong prediction: 0 points</li>
+            </ul>
+        </section>
+        <section class="glass-card panel">
+            <h2>Other rules</h2>
+            <ul>
+                <li>You must submit your prediction before kick-off time.</li>
+                <li>Changes are allowed until the match starts.</li>
+                <li>In case of a tie, correct score predictions are prioritized.</li>
+            </ul>
+        </section>
+    </div>
+}
+
+@code {
+    private Participant? _user;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        _user = await CurrentUser.GetCurrentUserAsync();
+
+        if (_user is null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        StateHasChanged();
+    }
+}
