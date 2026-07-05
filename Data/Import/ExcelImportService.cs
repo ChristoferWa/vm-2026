@@ -311,7 +311,7 @@ public sealed class ExcelImportService
             var matchNo = row.Cell(1).GetValue<int>();
             var kickoffUtc = ReadKickoffDate(row.Cell(2));
             var stage = row.Cell(3).GetString().Trim();
-            var groupName = row.Cell(4).GetString().Trim();
+            var groupName = ReadGroupName(stage, row.Cell(4).GetString().Trim());
             var venue = row.Cell(5).GetString().Trim();
             var homeCode = row.Cell(6).GetString().Trim().ToUpperInvariant();
             var awayCode = row.Cell(7).GetString().Trim().ToUpperInvariant();
@@ -336,7 +336,7 @@ public sealed class ExcelImportService
                 {
                     MatchNo = matchNo,
                     KickoffUtc = kickoffUtc,
-                    GroupName = string.IsNullOrWhiteSpace(groupName) ? stage : groupName,
+                    GroupName = groupName,
                     HomeTeamId = homeTeam.Id,
                     AwayTeamId = awayTeam.Id,
                     Status = ParseStatus(statusText),
@@ -348,7 +348,7 @@ public sealed class ExcelImportService
             }
 
             match.KickoffUtc = kickoffUtc;
-            match.GroupName = string.IsNullOrWhiteSpace(groupName) ? stage : groupName;
+            match.GroupName = groupName;
             match.Status = ParseStatus(statusText);
             match.HomeGoals = homeGoals;
             match.AwayGoals = awayGoals;
@@ -544,13 +544,23 @@ public sealed class ExcelImportService
             .FirstOrDefault(x => NormalizeTeamName(x.Name) == normalizedName);
 
         if (team is not null)
+        {
+            var flag = TeamFlags.GetFlag(teamName);
+
+            if (!string.IsNullOrWhiteSpace(flag) && string.IsNullOrWhiteSpace(team.FlagEmoji))
+            {
+                team.FlagEmoji = flag;
+                _db.SaveChanges();
+            }
+
             return team;
+        }
 
         team = new Team
         {
             Code = CreateTeamCode(teamName),
             Name = teamName.Trim(),
-            FlagEmoji = string.Empty
+            FlagEmoji = TeamFlags.GetFlag(teamName)
         };
 
         _db.Teams.Add(team);
@@ -564,9 +574,31 @@ public sealed class ExcelImportService
         var groupName = row.Cell(8).GetString().Trim();
         var stageName = row.Cell(7).GetString().Trim();
 
-        return string.IsNullOrWhiteSpace(groupName)
+        return ReadGroupName(stageName, groupName);
+    }
+
+    private static string ReadGroupName(string stageName, string groupName)
+    {
+        return IsKnockoutStageName(stageName) || string.IsNullOrWhiteSpace(groupName)
             ? stageName
             : groupName;
+    }
+
+    private static bool IsKnockoutStageName(string stageName)
+    {
+        var value = stageName.Trim().ToLowerInvariant();
+
+        return value.Contains("sextondel")
+            || value.Contains("round of 32")
+            || value.Contains("last 32")
+            || value.Contains("åtton")
+            || value.Contains("round of 16")
+            || value.Contains("last 16")
+            || value.Contains("kvart")
+            || value.Contains("quarter")
+            || value.Contains("semi")
+            || value == "final"
+            || value.Contains(" final");
     }
 
     private string CreateTeamCode(string teamName)

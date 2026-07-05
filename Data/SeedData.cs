@@ -9,6 +9,7 @@ public static class SeedData
         if (db.Participants.Any())
         {
             EnsureKnownAdmins(db);
+            EnsureTeamFlags(db);
             logger.LogInformation("Seed data already exists");
             return;
         }
@@ -86,6 +87,8 @@ public static class SeedData
 
             db.SaveChanges();
         }
+
+        EnsureTeamFlags(db);
     }
 
     private static void EnsureKnownAdmins(AppDbContext db)
@@ -100,6 +103,26 @@ public static class SeedData
         }
 
         if (knownAdmins.Count > 0)
+            db.SaveChanges();
+    }
+
+    private static void EnsureTeamFlags(AppDbContext db)
+    {
+        var teams = db.Teams.ToList();
+        var updated = false;
+
+        foreach (var team in teams)
+        {
+            var flag = TeamFlags.GetFlag(team.Name);
+
+            if (!string.IsNullOrWhiteSpace(flag) && team.FlagEmoji != flag)
+            {
+                team.FlagEmoji = flag;
+                updated = true;
+            }
+        }
+
+        if (updated)
             db.SaveChanges();
     }
 

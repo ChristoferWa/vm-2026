@@ -1,5 +1,6 @@
 @page "/matches"
 @page "/matches/{MatchId:int?}"
+@using VmTips.Web.Data
 @inject CurrentUserService CurrentUser
 @inject PredictionService PredictionService
 @inject NavigationManager Navigation
@@ -16,9 +17,9 @@ else if (SelectedMatch is not null)
     <a class="back-link" href="/matches">← Match</a>
     <section class="glass-card panel match-detail">
         <div class="versus">
-            <div><span class="flag-large">@SelectedMatch.HomeTeam.FlagEmoji</span><h2>@SelectedMatch.HomeTeam.Name</h2></div>
+            <div>@TeamFlagImage(SelectedMatch.HomeTeam, "flag-large-img", 80)<h2>@SelectedMatch.HomeTeam.Name</h2></div>
             <div><small>@SelectedMatch.KickoffUtc.ToLocalTime().ToString("MMM d, HH:mm")</small><strong>vs</strong><small>@SelectedMatch.GroupName</small></div>
-            <div><span class="flag-large">@SelectedMatch.AwayTeam.FlagEmoji</span><h2>@SelectedMatch.AwayTeam.Name</h2></div>
+            <div>@TeamFlagImage(SelectedMatch.AwayTeam, "flag-large-img", 80)<h2>@SelectedMatch.AwayTeam.Name</h2></div>
         </div>
         <div class="score-cards">
             <div class="score-card"><h3>Your prediction</h3><strong>@PredictionText(SelectedMatch)</strong></div>
@@ -140,9 +141,9 @@ else
                 <div class="score-card">
                     <a class="back-link" href="/matches/@match.Id">
                         <strong>
-                            @match.HomeTeam.FlagEmoji @match.HomeTeam.Name
+                            @TeamFlagImage(match.HomeTeam) @match.HomeTeam.Name
                             vs
-                            @match.AwayTeam.FlagEmoji @match.AwayTeam.Name
+                            @TeamFlagImage(match.AwayTeam) @match.AwayTeam.Name
                         </strong>
                     </a>
 
@@ -193,14 +194,73 @@ else
         </section>
     }
 
+    @if (KnockoutMatches.Any())
+    {
+        <section class="glass-card panel knockout-panel">
+            <div class="section-title-row">
+                <div>
+                    <h2>Knockout bracket</h2>
+                    <p>Round of 16 to final</p>
+                </div>
+            </div>
+
+            <div class="bracket-scroll">
+                <div class="bracket-grid">
+                    @foreach (var stage in KnockoutStages)
+                    {
+                        var stageMatches = KnockoutMatches
+                            .Where(x => StageKey(x.GroupName) == stage.Key)
+                            .OrderBy(x => x.KickoffUtc)
+                            .ThenBy(x => x.MatchNo)
+                            .ToList();
+
+                        if (stageMatches.Any())
+                        {
+                            <div class="bracket-round">
+                                <h3>@stage.Label</h3>
+
+                                @foreach (var match in stageMatches)
+                                {
+                                    <a class="bracket-match" href="/matches/@match.Id">
+                                        <div class="bracket-team">
+                                            @TeamFlagImage(match.HomeTeam)
+                                            <strong>@TeamShortName(match.HomeTeam)</strong>
+                                            <em>@ScorePart(match.HomeGoals)</em>
+                                        </div>
+                                        <div class="bracket-vs">vs</div>
+                                        <div class="bracket-team">
+                                            @TeamFlagImage(match.AwayTeam)
+                                            <strong>@TeamShortName(match.AwayTeam)</strong>
+                                            <em>@ScorePart(match.AwayGoals)</em>
+                                        </div>
+                                        <small>@MatchTimeText(match)</small>
+                                    </a>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </section>
+    }
+
     <section class="glass-card panel">
         @foreach (var match in _matches)
         {
-            <a class="match-row" href="/matches/@match.Id">
-                <span>@match.KickoffUtc.ToLocalTime().ToString("MMM d, HH:mm")</span>
-                <strong>@match.HomeTeam.FlagEmoji @match.HomeTeam.Name</strong>
-                <span>@ResultText(match)</span>
-                <strong>@match.AwayTeam.FlagEmoji @match.AwayTeam.Name</strong>
+            <a class="match-card-row" href="/matches/@match.Id">
+                <div>
+                    <small>@StageLabel(match.GroupName)</small>
+                    <span>@MatchTimeText(match)</span>
+                </div>
+                <div class="match-card-team">
+                    @TeamFlagImage(match.HomeTeam)
+                    <strong>@match.HomeTeam.Name</strong>
+                </div>
+                <div class="match-card-score">@ResultText(match)</div>
+                <div class="match-card-team">
+                    @TeamFlagImage(match.AwayTeam)
+                    <strong>@match.AwayTeam.Name</strong>
+                </div>
             </a>
         }
     </section>
@@ -215,11 +275,25 @@ else
     private int? _resultHomeGoals;
     private int? _resultAwayGoals;
     private Match? _selectedMatchWithAllPredictions;
+    private static readonly (string Key, string Label)[] KnockoutStages =
+    [
+        ("roundof32", "Round of 32"),
+        ("roundof16", "Round of 16"),
+        ("quarterfinal", "Quarter-finals"),
+        ("semifinal", "Semi-finals"),
+        ("final", "Final")
+    ];
+
     private Match? SelectedMatch => MatchId is null
      ? null
      : _selectedMatchWithAllPredictions
          ?? _todaysMatches.FirstOrDefault(x => x.Id == MatchId.Value)
          ?? _matches.FirstOrDefault(x => x.Id == MatchId.Value);
+    private IEnumerable<Match> KnockoutMatches => _matches
+        .Where(x => IsKnockoutStage(x.GroupName))
+        .OrderBy(x => StageOrder(x.GroupName))
+        .ThenBy(x => x.KickoffUtc)
+        .ThenBy(x => x.MatchNo);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -238,6 +312,76 @@ else
     }
 
     private static string ResultText(Match match) => match.HomeGoals is null || match.AwayGoals is null ? "-" : $"{match.HomeGoals} - {match.AwayGoals}";
+    private static string ScorePart(int? goals) => goals?.ToString() ?? "-";
+    private static MarkupString TeamFlagImage(Team team, string cssClass = "team-flag-img", int width = 40)
+    {
+        var code = TeamFlags.GetFlagCode(team.Name);
+
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            var fallback = System.Net.WebUtility.HtmlEncode(TeamShortName(team));
+            return new MarkupString($"<span class=\"team-flag-fallback\">{fallback}</span>");
+        }
+
+        return new MarkupString($"<img class=\"{cssClass}\" src=\"https://flagcdn.com/w{width}/{code}.png\" alt=\"\" loading=\"lazy\" />");
+    }
+    private static string TeamShortName(Team team) => team.Code.Length is >= 3 ? team.Code[..3].ToUpperInvariant() : team.Name;
+    private static string MatchTimeText(Match match)
+    {
+        if (match.Status == MatchStatus.Finished)
+            return "FT";
+
+        return match.KickoffUtc.ToLocalTime().ToString("MMM d, HH:mm");
+    }
+    private static string StageLabel(string groupName)
+    {
+        return StageKey(groupName) switch
+        {
+            "roundof32" => "Round of 32",
+            "roundof16" => "Round of 16",
+            "quarterfinal" => "Quarter-final",
+            "semifinal" => "Semi-final",
+            "final" => "Final",
+            _ => groupName
+        };
+    }
+    private static bool IsKnockoutStage(string groupName)
+    {
+        return StageKey(groupName) is "roundof32" or "roundof16" or "quarterfinal" or "semifinal" or "final";
+    }
+    private static int StageOrder(string groupName)
+    {
+        return StageKey(groupName) switch
+        {
+            "roundof32" => 1,
+            "roundof16" => 2,
+            "quarterfinal" => 3,
+            "semifinal" => 4,
+            "final" => 5,
+            _ => 9
+        };
+    }
+    private static string StageKey(string groupName)
+    {
+        var value = groupName.Trim().ToLowerInvariant();
+
+        if (value.Contains("sextondel") || value.Contains("round of 32") || value.Contains("last 32"))
+            return "roundof32";
+
+        if (value.Contains("åtton") || value.Contains("round of 16") || value.Contains("last 16"))
+            return "roundof16";
+
+        if (value.Contains("kvart") || value.Contains("quarter"))
+            return "quarterfinal";
+
+        if (value.Contains("semi"))
+            return "semifinal";
+
+        if (value.Contains("final"))
+            return "final";
+
+        return value;
+    }
     private string PredictionText(Match match)
     {
         if (_user is null)

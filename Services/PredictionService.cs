@@ -95,4 +95,20 @@ public sealed class PredictionService(AppDbContext db, ILogger<PredictionService
 
         logger.LogInformation("Saved kickoff for match {MatchId}", matchId);
     }
+
+    public async Task SaveGroupNameAsync(int matchId, string groupName)
+    {
+        var normalizedGroupName = groupName.Trim();
+
+        if (string.IsNullOrWhiteSpace(normalizedGroupName))
+            throw new InvalidOperationException("Stage cannot be empty.");
+
+        var match = await db.Matches.FirstAsync(x => x.Id == matchId);
+
+        match.GroupName = normalizedGroupName;
+
+        await db.SaveChangesAsync();
+
+        logger.LogInformation("Saved stage/group for match {MatchId}", matchId);
+    }
 }

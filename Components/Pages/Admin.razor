@@ -80,6 +80,32 @@ else
                         vs
                         @match.AwayTeam.FlagEmoji @match.AwayTeam.Name
                     </strong>
+
+                    <div class="admin-stage-controls">
+                        <MudSelect T="string"
+                                   Value="@GroupNameText(match.Id)"
+                                   ValueChanged="value => _groupNames[match.Id] = value ?? string.Empty"
+                                   Label="Stage"
+                                   Variant="Variant.Outlined"
+                                   Dense="true"
+                                   Class="stage-input">
+                            @if (!StageOptions.Contains(GroupNameText(match.Id)))
+                            {
+                                <MudSelectItem Value="@GroupNameText(match.Id)">@GroupNameText(match.Id)</MudSelectItem>
+                            }
+
+                            @foreach (var stage in StageOptions)
+                            {
+                                <MudSelectItem Value="@stage">@stage</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   OnClick="() => SaveGroupName(match.Id)">
+                            Save stage
+                        </MudButton>
+                    </div>
                 </div>
 
                 <MudTextField T="string"
@@ -137,6 +163,16 @@ else
     private Dictionary<int, int?> _resultHomeGoals = new();
     private Dictionary<int, int?> _resultAwayGoals = new();
     private Dictionary<int, string> _kickoffTexts = new();
+    private Dictionary<int, string> _groupNames = new();
+    private static readonly string[] StageOptions =
+    [
+        "Gruppspel",
+        "Sextondelsfinal",
+        "Åttondelsfinal",
+        "Kvartsfinal",
+        "Semifinal",
+        "Final"
+    ];
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -215,9 +251,35 @@ else
         }
     }
 
+    private async Task SaveGroupName(int matchId)
+    {
+        if (!_groupNames.TryGetValue(matchId, out var groupName))
+            return;
+
+        try
+        {
+            await PredictionService.SaveGroupNameAsync(matchId, groupName);
+
+            await ReloadMatchesAsync();
+
+            Snackbar.Add("Stage saved", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
     private string KickoffText(int matchId)
     {
         return _kickoffTexts.TryGetValue(matchId, out var value)
+            ? value
+            : string.Empty;
+    }
+
+    private string GroupNameText(int matchId)
+    {
+        return _groupNames.TryGetValue(matchId, out var value)
             ? value
             : string.Empty;
     }
@@ -275,6 +337,7 @@ else
             _resultHomeGoals[match.Id] = match.HomeGoals;
             _resultAwayGoals[match.Id] = match.AwayGoals;
             _kickoffTexts[match.Id] = match.KickoffUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+            _groupNames[match.Id] = match.GroupName;
         }
     }
 }
