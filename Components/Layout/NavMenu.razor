@@ -14,32 +14,38 @@
         <MudNavLink Href="/dashboard"
                     Match="NavLinkMatch.All"
                     ForceLoad="true"
+                    @onclick="HandleNavigate"
                     Icon="@Icons.Material.Filled.Dashboard">
             Dashboard
         </MudNavLink>
 
         <MudNavLink Href="/predictions"
+                    @onclick="HandleNavigate"
                     Icon="@Icons.Material.Filled.SportsSoccer">
             My Predictions
         </MudNavLink>
 
         <MudNavLink Href="/matches"
+                    @onclick="HandleNavigate"
                     Icon="@Icons.Material.Filled.CalendarMonth">
             Matches
         </MudNavLink>
 
         <MudNavLink Href="/leaderboard"
+                    @onclick="HandleNavigate"
                     Icon="@Icons.Material.Filled.Leaderboard">
             Leaderboard
         </MudNavLink>
 
         <MudNavLink Href="/rules"
+                    @onclick="HandleNavigate"
                     Icon="@Icons.Material.Filled.Info">
             Rules
         </MudNavLink>
         @if (_user?.IsAdmin == true)
         {
             <MudNavLink Href="/admin"
+                        @onclick="HandleNavigate"
                         Icon="@Icons.Material.Filled.AdminPanelSettings">
                 Admin
             </MudNavLink>
@@ -59,6 +65,8 @@
 </aside>
 
 @code {
+    [Parameter] public EventCallback OnNavigate { get; set; }
+
     private Participant? _user;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -74,5 +82,11 @@
     {
         await CurrentUser.LogoutAsync();
         Navigation.NavigateTo("/login", forceLoad: true);
+    }
+
+    private async Task HandleNavigate()
+    {
+        if (OnNavigate.HasDelegate)
+            await OnNavigate.InvokeAsync();
     }
 }

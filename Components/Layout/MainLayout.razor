@@ -9,7 +9,25 @@
 <div class="app-shell @(IsLoginPage ? "login-shell" : string.Empty)">
     @if (!IsLoginPage)
     {
-        <NavMenu />
+        <div class="mobile-topbar glass-card">
+            <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                           Color="Color.Inherit"
+                           Edge="Edge.Start"
+                           OnClick="ToggleNav" />
+            <div class="mobile-brand">
+                <strong>WORLD CUP</strong>
+                <span>PREDICTOR</span>
+            </div>
+        </div>
+
+        <button class="nav-backdrop @(_isNavOpen ? "open" : string.Empty)"
+                type="button"
+                aria-label="Close navigation"
+                @onclick="CloseNav"></button>
+
+        <div class="nav-drawer @(_isNavOpen ? "open" : string.Empty)">
+            <NavMenu OnNavigate="CloseNav" />
+        </div>
     }
 
     <main class="main-content">
@@ -18,6 +36,8 @@
 </div>
 
 @code {
+    private bool _isNavOpen;
+
     private readonly MudTheme _theme = new()
     {
         PaletteDark = new PaletteDark
@@ -42,5 +62,15 @@
             return string.IsNullOrEmpty(path) ||
                 path.Equals("/login", StringComparison.OrdinalIgnoreCase);
         }
+    }
+
+    private void ToggleNav()
+    {
+        _isNavOpen = !_isNavOpen;
+    }
+
+    private void CloseNav()
+    {
+        _isNavOpen = false;
     }
 }

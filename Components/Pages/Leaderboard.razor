@@ -31,28 +31,28 @@ else
     </div>
 
     <section class="glass-card panel">
-        <MudTable Items="_rows" Hover="true" Elevation="0">
-            <HeaderContent>
-                <MudTh>#</MudTh>
-                <MudTh>Player</MudTh>
-                <MudTh>Points</MudTh>
-                <MudTh>Exact score</MudTh>
-                <MudTh>Outcome</MudTh>
-                <MudTh>Submitted</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd>@context.Rank</MudTd>
-                <MudTd>
-                    <span class="@(context.IsCurrentUser ? "gold-text" : string.Empty)">
-                        @context.ParticipantName
-                    </span>
-                </MudTd>
-                <MudTd><strong>@context.Points</strong></MudTd>
-                <MudTd>@context.CorrectScore</MudTd>
-                <MudTd>@context.CorrectOutcome</MudTd>
-                <MudTd>@context.PredictionsSubmitted</MudTd>
-            </RowTemplate>
-        </MudTable>
+        <div class="leaderboard-list">
+            <div class="leaderboard-list-header">
+                <span>#</span>
+                <span>Player</span>
+                <span>Points</span>
+                <span>Exact</span>
+                <span>Outcome</span>
+                <span>Submitted</span>
+            </div>
+
+            @foreach (var row in _rows)
+            {
+                <div class="leaderboard-list-row @(row.IsCurrentUser ? "current" : string.Empty)">
+                    <span class="leaderboard-rank">#@row.Rank</span>
+                    <strong>@row.ParticipantName</strong>
+                    <span><b>@row.Points</b> pts</span>
+                    <span>@row.CorrectScore exact</span>
+                    <span>@row.CorrectOutcome outcomes</span>
+                    <span>@row.PredictionsSubmitted submitted</span>
+                </div>
+            }
+        </div>
     </section>
 }
 
