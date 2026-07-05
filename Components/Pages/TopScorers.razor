@@ -1,0 +1,123 @@
+@page "/top-scorers"
+@inject CurrentUserService CurrentUser
+@inject TopScorersService TopScorersService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Top Scorers</PageTitle>
+
+@if (_user is null)
+{
+    <LoginRedirect />
+}
+else
+{
+    <div class="page-header">
+        <div>
+            <h1>Top Scorers</h1>
+            <p>Current goal leaders from the tournament API.</p>
+        </div>
+    </div>
+
+    <section class="glass-card panel top-scorers-panel">
+        <div class="section-title-row">
+            <div>
+                <h2>Goals leaderboard</h2>
+                @if (_result is not null)
+                {
+                    <p>Fetched @_result.FetchedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</p>
+                }
+            </div>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Disabled="_isLoading"
+                       OnClick="FetchTopScorers">
+                @(_isLoading ? "Fetching..." : "Fetch top scorers")
+            </MudButton>
+        </div>
+
+        @if (_result is null)
+        {
+            <div class="empty-state">
+                Fetch the current top scorers when you want to refresh the list.
+            </div>
+        }
+        else if (!_result.Scorers.Any())
+        {
+            <MudAlert Severity="Severity.Info" Class="mt-4">
+                No scorers returned from the API.
+            </MudAlert>
+        }
+        else
+        {
+            <div class="top-scorer-list">
+                @foreach (var scorer in _result.Scorers)
+                {
+                    <div class="top-scorer-row">
+                        <div class="top-scorer-rank">#@scorer.Rank</div>
+                        <div class="top-scorer-player">
+                            <strong>@scorer.PlayerName</strong>
+                            <span>
+                                @if (!string.IsNullOrWhiteSpace(scorer.TeamCrestUrl))
+                                {
+                                    <img src="@scorer.TeamCrestUrl" alt="" loading="lazy" />
+                                }
+                                @scorer.TeamName
+                            </span>
+                        </div>
+                        <div class="top-scorer-goals">
+                            <strong>@scorer.Goals</strong>
+                            <span>goals</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private Participant? _user;
+    private TopScorersResult? _result;
+    private bool _isLoading;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        _user = await CurrentUser.GetCurrentUserAsync();
+
+        if (_user is null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task FetchTopScorers()
+    {
+        try
+        {
+            _isLoading = true;
+            StateHasChanged();
+
+            _result = await TopScorersService.GetTopScorersAsync(10);
+
+            Snackbar.Add("Top scorers fetched", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+}
+

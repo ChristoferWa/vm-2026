@@ -617,6 +617,72 @@ ul { line-height: 2; color: var(--text); }
     color: var(--muted);
 }
 
+.top-scorers-panel .section-title-row {
+    margin-bottom: 18px;
+}
+
+.top-scorer-list {
+    display: grid;
+    gap: 10px;
+}
+
+.top-scorer-row {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) 96px;
+    gap: 14px;
+    align-items: center;
+    padding: 14px;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 12px;
+    background: rgba(255,255,255,.035);
+}
+
+.top-scorer-rank {
+    color: var(--gold);
+    font-weight: 900;
+    font-size: 18px;
+}
+
+.top-scorer-player {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+}
+
+.top-scorer-player strong {
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.top-scorer-player span {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.top-scorer-player img {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+}
+
+.top-scorer-goals {
+    display: grid;
+    justify-items: end;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.top-scorer-goals strong {
+    color: var(--text);
+    font-size: 26px;
+    line-height: 1;
+}
+
 @media (max-width: 700px) {
     .admin-result-row {
         grid-template-columns: 1fr;
@@ -669,6 +735,15 @@ ul { line-height: 2; color: var(--text); }
 
     .kpi-card {
         padding: 16px;
+    }
+
+    .top-scorer-row {
+        grid-template-columns: 48px minmax(0, 1fr) 72px;
+        padding: 12px;
+    }
+
+    .top-scorer-goals strong {
+        font-size: 22px;
     }
 }
 .kickoff-input {

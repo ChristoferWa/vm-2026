@@ -27,6 +27,7 @@ builder.Services.AddScoped<PredictionService>();
 builder.Services.AddScoped<LeaderboardService>();
 builder.Services.AddScoped<AdminService>();
 builder.Services.AddHttpClient<ResultSyncService>();
+builder.Services.AddHttpClient<TopScorersService>();
 
 var databaseProvider = builder.Configuration["Database:Provider"] ?? "Postgres";
 
