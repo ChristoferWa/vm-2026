@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 using VmTips.Web.Components;
 using VmTips.Web.Data;
+using VmTips.Web.Models;
 using VmTips.Web.Services;
 using VmTips.Web.Services.Import;
 
@@ -15,6 +16,7 @@ builder.Logging.AddDebug();
 builder.Logging.AddFilter("MudBlazor", LogLevel.Warning);
 builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning);
 builder.Services.AddScoped<ExcelImportService>();
+builder.Services.Configure<ResultsApiSettings>(builder.Configuration.GetSection("ResultsApi"));
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
@@ -24,6 +26,7 @@ builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<PredictionService>();
 builder.Services.AddScoped<LeaderboardService>();
 builder.Services.AddScoped<AdminService>();
+builder.Services.AddHttpClient<ResultSyncService>();
 
 var databaseProvider = builder.Configuration["Database:Provider"] ?? "Postgres";
 

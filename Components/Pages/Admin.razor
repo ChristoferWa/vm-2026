@@ -2,6 +2,7 @@
 @inject CurrentUserService CurrentUser
 @inject AdminService AdminService
 @inject PredictionService PredictionService
+@inject ResultSyncService ResultSyncService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 
@@ -64,6 +65,72 @@ else
         @if (!string.IsNullOrWhiteSpace(_lastImportMessage))
         {
             <p>@_lastImportMessage</p>
+        }
+    </section>
+
+    <section class="glass-card panel" style="margin-top: 18px;">
+        <h2>API results</h2>
+
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Primary"
+                   Disabled="_isFetchingResults"
+                   OnClick="PreviewLatestResults">
+            @(_isFetchingResults ? "Fetching..." : "Fetch latest results")
+        </MudButton>
+
+        @if (_resultSyncPreview is not null)
+        {
+            <MudAlert Severity="@(_resultSyncPreview.Updates.Any() ? Severity.Info : Severity.Success)" Class="mt-4">
+                @_resultSyncPreview.Summary
+            </MudAlert>
+
+            @if (!_resultSyncPreview.Updates.Any() && _resultSyncPreview.IgnoredApiMatches > 0)
+            {
+                <p class="api-sync-note">
+                    The API returned finished matches, but most of them do not belong to the teams in this imported tournament.
+                </p>
+            }
+
+            @if (_resultSyncPreview.Updates.Any())
+            {
+                <MudTable Items="_resultSyncPreview.Updates" Dense="true" Hover="true" Elevation="0" Class="mt-4">
+                    <HeaderContent>
+                        <MudTh>Match</MudTh>
+                        <MudTh>Current</MudTh>
+                        <MudTh>API</MudTh>
+                        <MudTh>Source</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>
+                            <strong>@context.HomeTeamName vs @context.AwayTeamName</strong>
+                            <small>@context.KickoffUtc.ToLocalTime().ToString("MMM d, HH:mm")</small>
+                        </MudTd>
+                        <MudTd>@ScoreText(context.CurrentHomeGoals, context.CurrentAwayGoals)</MudTd>
+                        <MudTd>@context.ApiHomeGoals - @context.ApiAwayGoals</MudTd>
+                        <MudTd>@context.SourceMatch</MudTd>
+                    </RowTemplate>
+                </MudTable>
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Disabled="_isApplyingResults"
+                           Class="mt-4"
+                           OnClick="ApplyResultUpdates">
+                    @(_isApplyingResults ? "Applying..." : "Apply result updates")
+                </MudButton>
+            }
+
+            @if (_resultSyncPreview.Skipped.Any())
+            {
+                <MudExpansionPanels Elevation="0" Class="mt-4">
+                    <MudExpansionPanel Text="Show skipped API matches">
+                        @foreach (var skipped in _resultSyncPreview.Skipped)
+                        {
+                            <div>@skipped</div>
+                        }
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            }
         }
     </section>
 
@@ -157,8 +224,11 @@ else
     private AppSettings? _settings;
     private bool _isUpdatingLock;
     private bool _isImportingTips;
+    private bool _isFetchingResults;
+    private bool _isApplyingResults;
     private string? _lastImportMessage;
     private IBrowserFile? _selectedImportFile;
+    private ResultSyncPreview? _resultSyncPreview;
     private List<Match> _matches = new();
     private Dictionary<int, int?> _resultHomeGoals = new();
     private Dictionary<int, int?> _resultAwayGoals = new();
@@ -270,11 +340,69 @@ else
         }
     }
 
+    private async Task PreviewLatestResults()
+    {
+        try
+        {
+            _isFetchingResults = true;
+            _resultSyncPreview = null;
+            StateHasChanged();
+
+            _resultSyncPreview = await ResultSyncService.PreviewLatestResultsAsync();
+
+            Snackbar.Add("Latest results fetched", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _isFetchingResults = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ApplyResultUpdates()
+    {
+        if (_resultSyncPreview is null || !_resultSyncPreview.Updates.Any())
+            return;
+
+        try
+        {
+            _isApplyingResults = true;
+            StateHasChanged();
+
+            var updatedCount = await ResultSyncService.ApplyUpdatesAsync(_resultSyncPreview.Updates);
+
+            await ReloadMatchesAsync();
+
+            _resultSyncPreview = null;
+            Snackbar.Add($"{updatedCount} results updated", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _isApplyingResults = false;
+            StateHasChanged();
+        }
+    }
+
     private string KickoffText(int matchId)
     {
         return _kickoffTexts.TryGetValue(matchId, out var value)
             ? value
             : string.Empty;
+    }
+
+    private static string ScoreText(int? homeGoals, int? awayGoals)
+    {
+        return homeGoals is null || awayGoals is null
+            ? "-"
+            : $"{homeGoals} - {awayGoals}";
     }
 
     private string GroupNameText(int matchId)
