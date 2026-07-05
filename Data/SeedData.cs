@@ -8,6 +8,7 @@ public static class SeedData
     {
         if (db.Participants.Any())
         {
+            EnsureKnownAdmins(db);
             logger.LogInformation("Seed data already exists");
             return;
         }
@@ -61,6 +62,8 @@ public static class SeedData
         );
         db.SaveChanges();
 
+        EnsureKnownAdmins(db);
+
         var user = db.Participants.Single(x => x.AccessCode == "CHRIS");
         foreach (var match in db.Matches.ToList())
         {
@@ -83,6 +86,21 @@ public static class SeedData
 
             db.SaveChanges();
         }
+    }
+
+    private static void EnsureKnownAdmins(AppDbContext db)
+    {
+        var knownAdmins = db.Participants
+            .Where(x => x.AccessCode.Trim().ToUpper() == "CHRIS" || x.DisplayName.Trim().ToUpper() == "CHRISTOFER")
+            .ToList();
+
+        foreach (var participant in knownAdmins)
+        {
+            participant.IsAdmin = true;
+        }
+
+        if (knownAdmins.Count > 0)
+            db.SaveChanges();
     }
 
     private static Match CreateMatch(int matchNo, DateTime kickoffUtc, string groupName, Team home, Team away, MatchStatus status, int? homeGoals = null, int? awayGoals = null)

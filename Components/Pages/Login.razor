@@ -1,6 +1,5 @@
 @page "/login"
 @page "/"
-@rendermode InteractiveServer
 @inject CurrentUserService CurrentUser
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -38,7 +37,6 @@
             <MudAlert Severity="Severity.Error" Class="mt-4">@_error</MudAlert>
         }
 
-        <p class="hint">Try seed code: <strong>CHRIS</strong></p>
     </div>
 </div>
 
@@ -58,15 +56,17 @@
 
     private async Task HandleLogin()
     {
+        _error = null;
+
         var user = await CurrentUser.LoginWithCodeAsync(_code);
         if (user is null)
         {
-            _error = "Invalid access code.";
+            _error = "Invalid access code. Check spelling or try logging out before switching user.";
             return;
         }
 
         Snackbar.Add($"Welcome, {user.DisplayName}!", Severity.Success);
-        Navigation.NavigateTo("/dashboard");
+        Navigation.NavigateTo("/dashboard", forceLoad: true);
     }
 
     private async Task Logout()

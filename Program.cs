@@ -27,7 +27,7 @@ builder.Services.AddScoped<AdminService>();
 
 var databaseProvider = builder.Configuration["Database:Provider"] ?? "Postgres";
 
-builder.Services.AddDbContext<AppDbContext>(options =>
+void ConfigureDatabase(DbContextOptionsBuilder options)
 {
     if (databaseProvider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
     {
@@ -47,7 +47,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     }
 
     options.EnableSensitiveDataLogging(builder.Environment.IsDevelopment());
-});
+}
+
+builder.Services.AddDbContext<AppDbContext>(ConfigureDatabase);
+builder.Services.AddDbContextFactory<AppDbContext>(ConfigureDatabase, ServiceLifetime.Scoped);
 
 var app = builder.Build();
 

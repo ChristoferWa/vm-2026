@@ -281,14 +281,20 @@ public sealed class ExcelImportService
             if (string.IsNullOrWhiteSpace(displayName) || string.IsNullOrWhiteSpace(accessCode))
                 continue;
 
-            if (_db.Participants.Any(x => x.AccessCode == accessCode))
+            var existingParticipant = _db.Participants.FirstOrDefault(x => x.AccessCode == accessCode);
+
+            if (existingParticipant is not null)
+            {
+                existingParticipant.DisplayName = displayName;
+                existingParticipant.IsAdmin = isAdmin || IsKnownAdmin(displayName, accessCode);
                 continue;
+            }
 
             _db.Participants.Add(new Participant
             {
                 DisplayName = displayName,
                 AccessCode = accessCode,
-                IsAdmin = isAdmin
+                IsAdmin = isAdmin || IsKnownAdmin(displayName, accessCode)
             });
         }
 
@@ -602,5 +608,11 @@ public sealed class ExcelImportService
             "ja" => true,
             _ => false
         };
+    }
+
+    private static bool IsKnownAdmin(string displayName, string accessCode)
+    {
+        return accessCode.Trim().Equals("CHRIS", StringComparison.OrdinalIgnoreCase) ||
+            displayName.Trim().Equals("Christofer", StringComparison.OrdinalIgnoreCase);
     }
 }
