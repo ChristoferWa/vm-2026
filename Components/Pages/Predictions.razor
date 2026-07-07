@@ -100,6 +100,28 @@ else
                             </MudButton>
                         }
                     </div>
+
+                    <div class="prediction-points">
+                        @if (PredictionPoints(match, prediction) is { } points)
+                        {
+                            <div>
+                                <span>Goal points</span>
+                                <strong>@points.GoalPoints</strong>
+                            </div>
+                            <div>
+                                <span>Outcome points</span>
+                                <strong>@points.OutcomePoints</strong>
+                            </div>
+                            <div>
+                                <span>Total</span>
+                                <strong>@points.TotalPoints</strong>
+                            </div>
+                        }
+                        else
+                        {
+                            <small>@PredictionPointsPendingText(match, prediction)</small>
+                        }
+                    </div>
                 </div>
             </div>
         }
@@ -150,6 +172,30 @@ else
         return new MarkupString($"<img class=\"team-flag-img\" src=\"https://flagcdn.com/w40/{code}.png\" alt=\"\" loading=\"lazy\" />");
     }
     private static string TeamShortName(Team team) => team.Code.Length is >= 3 ? team.Code[..3].ToUpperInvariant() : team.Name;
+    private static (int GoalPoints, int OutcomePoints, int TotalPoints)? PredictionPoints(Match match, Prediction? prediction)
+    {
+        if (prediction is null)
+            return null;
+
+        if (prediction.HomeGoals is null || prediction.AwayGoals is null)
+            return null;
+
+        if (match.HomeGoals is null || match.AwayGoals is null)
+            return null;
+
+        return LeaderboardService.CalculatePredictionPointsBreakdown(prediction, match);
+    }
+
+    private static string PredictionPointsPendingText(Match match, Prediction? prediction)
+    {
+        if (prediction is null || prediction.HomeGoals is null || prediction.AwayGoals is null)
+            return "No points yet - prediction not submitted.";
+
+        if (match.HomeGoals is null || match.AwayGoals is null)
+            return "Points pending until result is available.";
+
+        return "No points yet.";
+    }
     private void BuildEditState()
     {
         _edits = _matches.ToDictionary(

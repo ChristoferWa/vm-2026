@@ -65,24 +65,31 @@ public sealed class LeaderboardService(AppDbContext db)
     }
     public static int CalculatePredictionPoints(Prediction prediction, Match match)
     {
+        return CalculatePredictionPointsBreakdown(prediction, match).TotalPoints;
+    }
+
+    public static (int GoalPoints, int OutcomePoints, int TotalPoints) CalculatePredictionPointsBreakdown(Prediction prediction, Match match)
+    {
         if (prediction.HomeGoals is null || prediction.AwayGoals is null)
-            return 0;
+            return (0, 0, 0);
 
         if (match.HomeGoals is null || match.AwayGoals is null)
-            return 0;
+            return (0, 0, 0);
 
-        var points = 0;
+        var goalPoints = 0;
 
         if (prediction.HomeGoals == match.HomeGoals)
-            points += CorrectHomeGoalsPoints;
+            goalPoints += CorrectHomeGoalsPoints;
 
         if (prediction.AwayGoals == match.AwayGoals)
-            points += CorrectAwayGoalsPoints;
+            goalPoints += CorrectAwayGoalsPoints;
+
+        var outcomePoints = 0;
 
         if (GetOutcome(prediction.HomeGoals.Value, prediction.AwayGoals.Value) == GetOutcome(match.HomeGoals.Value, match.AwayGoals.Value))
-            points += CorrectOutcomePoints;
+            outcomePoints += CorrectOutcomePoints;
 
-        return points;
+        return (goalPoints, outcomePoints, goalPoints + outcomePoints);
     }
     private static (int Points, int CorrectScore, int CorrectOutcome, int PredictionsSubmitted) CalculateParticipantScore(Participant participant)
     {
