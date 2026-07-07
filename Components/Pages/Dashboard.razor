@@ -1,4 +1,5 @@
 @page "/dashboard"
+@using VmTips.Web.Data
 @inject CurrentUserService CurrentUser
 @inject PredictionService Predictions
 @inject LeaderboardService Leaderboard
@@ -27,17 +28,17 @@ else
 
     <div class="dashboard-stack">
        <section class="glass-card panel">
-    <h2>Today's matches - @DateTime.Now.ToString("MMM d")</h2>
+    <h2>Today's matches - @TodayInSweden.ToString("MMM d")</h2>
 
     @if (TodaysMatches.Any())
     {
         @foreach (var match in TodaysMatches)
         {
             <a class="match-row" href="/matches/@match.Id">
-                <span>@match.KickoffUtc.ToLocalTime().ToString("HH:mm")</span>
-                <strong>@match.HomeTeam.FlagEmoji @match.HomeTeam.Name</strong>
+                <span>@match.KickoffUtc.ToString("HH:mm")</span>
+                <strong class="dashboard-match-team">@TeamFlagImage(match.HomeTeam) @match.HomeTeam.Name</strong>
                 <span>vs</span>
-                <strong>@match.AwayTeam.FlagEmoji @match.AwayTeam.Name</strong>
+                <strong class="dashboard-match-team">@TeamFlagImage(match.AwayTeam) @match.AwayTeam.Name</strong>
             </a>
         }
     }
@@ -67,8 +68,39 @@ else
     private List<LeaderboardRow> _leaderboard = new();
     private LeaderboardRow? _me;
     private string CurrentRankText => _me is null ? "-" : $"#{_me.Rank}";
+    private static DateTime TodayInSweden => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, SwedishTimeZone).Date;
     private IEnumerable<Match> TodaysMatches =>
-    _matches.Where(x => x.KickoffUtc.ToLocalTime().Date == DateTime.Today);
+    _matches.Where(x => x.KickoffUtc.Date == TodayInSweden);
+
+    private static TimeZoneInfo SwedishTimeZone => _swedishTimeZone ??= GetSwedishTimeZone();
+    private static TimeZoneInfo? _swedishTimeZone;
+
+    private static TimeZoneInfo GetSwedishTimeZone()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("W. Europe Standard Time");
+        }
+    }
+
+    private static MarkupString TeamFlagImage(Team team)
+    {
+        var code = TeamFlags.GetFlagCode(team.Name);
+
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            var fallback = System.Net.WebUtility.HtmlEncode(TeamShortName(team));
+            return new MarkupString($"<span class=\"team-flag-fallback\">{fallback}</span>");
+        }
+
+        return new MarkupString($"<img class=\"team-flag-img\" src=\"https://flagcdn.com/w40/{code}.png\" alt=\"\" loading=\"lazy\" />");
+    }
+
+    private static string TeamShortName(Team team) => team.Code.Length is >= 3 ? team.Code[..3].ToUpperInvariant() : team.Name;
 
 protected override async Task OnAfterRenderAsync(bool firstRender)
 {
