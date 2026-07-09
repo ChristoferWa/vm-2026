@@ -25,7 +25,8 @@ else
                 <div class="podium-rank">#@row.Rank</div>
                 <h2>@row.ParticipantName</h2>
                 <strong>@row.Points pts</strong>
-                <small>@row.CorrectScore exact scores � @row.CorrectOutcome outcomes</small>
+                <span class="leaderboard-form @FormClass(row.RankChange)">@FormText(row.RankChange)</span>
+                <small>@row.CorrectScore exact scores • @row.CorrectOutcome outcomes</small>
             </div>
         }
     </div>
@@ -39,6 +40,7 @@ else
                 <span>Exact</span>
                 <span>Outcome</span>
                 <span>Submitted</span>
+                <span>Form</span>
             </div>
 
             @foreach (var row in _rows)
@@ -50,6 +52,7 @@ else
                     <span>@row.CorrectScore exact</span>
                     <span>@row.CorrectOutcome outcomes</span>
                     <span>@row.PredictionsSubmitted submitted</span>
+                    <span class="leaderboard-form @FormClass(row.RankChange)">@FormText(row.RankChange)</span>
                 </div>
             }
         </div>
@@ -74,5 +77,25 @@ else
 
         _rows = await LeaderboardService.GetLeaderboardAsync(user.Id);
         StateHasChanged();
+    }
+
+    private static string FormText(int rankChange)
+    {
+        return rankChange switch
+        {
+            > 0 => $"▲ +{rankChange}",
+            < 0 => $"▼ {rankChange}",
+            _ => "–"
+        };
+    }
+
+    private static string FormClass(int rankChange)
+    {
+        return rankChange switch
+        {
+            > 0 => "up",
+            < 0 => "down",
+            _ => "same"
+        };
     }
 }

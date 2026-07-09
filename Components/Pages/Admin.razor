@@ -28,26 +28,34 @@ else
         </div>
     </div>
 
-    <section class="glass-card panel">
+    @if (!string.IsNullOrWhiteSpace(_loadError))
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">
+            @_loadError
+        </MudAlert>
+    }
+
+    <MudTabs Rounded="true" Elevation="0" Class="admin-tabs">
+    <MudTabPanel Text="Predictions">
+    <section class="glass-card panel admin-tab-panel">
         <h2>Predictions</h2>
 
-        @if (_settings is not null)
-        {
-            <MudAlert Severity="@(_settings.PredictionsLocked? Severity.Warning: Severity.Success)">
-                Predictions are currently <strong>@(_settings.PredictionsLocked ? "locked" : "open")</strong>.
-            </MudAlert>
+        <MudAlert Severity="@(_predictionsLocked? Severity.Warning: Severity.Success)">
+            Predictions are currently <strong>@(_predictionsLocked ? "locked" : "open")</strong>.
+        </MudAlert>
 
-            <MudButton Variant="Variant.Filled"
-                       Color="@(_settings.PredictionsLocked ? Color.Success : Color.Warning)"
-                       Disabled="_isUpdatingLock"
-                       Class="mt-4"
-                       OnClick="TogglePredictionsLock">
-                @(_settings.PredictionsLocked ? "Unlock predictions" : "Lock predictions")
-            </MudButton>
-        }
+        <MudButton Variant="Variant.Filled"
+                   Color="@(_predictionsLocked ? Color.Success : Color.Warning)"
+                   Disabled="_isUpdatingLock"
+                   Class="mt-4"
+                   OnClick="TogglePredictionsLock">
+            @(_predictionsLocked ? "Unlock predictions" : "Lock predictions")
+        </MudButton>
     </section>
+    </MudTabPanel>
 
-    <section class="glass-card panel" style="margin-top: 18px;">
+    <MudTabPanel Text="Import">
+    <section class="glass-card panel admin-tab-panel">
         <h2>Excel import</h2>
 
         <div class="mt-4">
@@ -67,8 +75,10 @@ else
             <p>@_lastImportMessage</p>
         }
     </section>
+    </MudTabPanel>
 
-    <section class="glass-card panel" style="margin-top: 18px;">
+    <MudTabPanel Text="API results">
+    <section class="glass-card panel admin-tab-panel">
         <h2>API results</h2>
 
         <MudButton Variant="Variant.Outlined"
@@ -133,8 +143,29 @@ else
             }
         }
     </section>
+    </MudTabPanel>
 
-    <section class="glass-card panel" style="margin-top: 18px;">
+    <MudTabPanel Text="Knockout">
+    <section class="glass-card panel admin-tab-panel">
+        <h2>Knockout teams</h2>
+        <p>Fill the next round from the winners in the previous round. If a match ended in a draw, choose the team that advanced below before filling the next round.</p>
+
+        <div class="admin-knockout-actions">
+            @foreach (var transition in KnockoutTransitions)
+            {
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           Disabled="_isFillingKnockout"
+                           OnClick="() => FillNextRound(transition.Source, transition.Target)">
+                    @($"Fill {transition.Target}")
+                </MudButton>
+            }
+        </div>
+    </section>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Results">
+    <section class="glass-card panel admin-tab-panel">
         <h2>Results</h2>
 
         @foreach (var match in _matches)
@@ -214,24 +245,71 @@ else
                            OnClick="() => SaveResult(match.Id)">
                     Save
                 </MudButton>
+
+                @if (NeedsAdvancingTeam(match))
+                {
+                    <div class="admin-advancing-team">
+                        <MudSelect T="int?"
+                                   Value="@AdvancingTeamValue(match.Id)"
+                                   ValueChanged="value => _advancingTeamIds[match.Id] = value"
+                                   Label="Advancing team"
+                                   Variant="Variant.Outlined"
+                                   Dense="true">
+                            <MudSelectItem T="int?" Value="@((int?)match.HomeTeamId)">@match.HomeTeam.Name</MudSelectItem>
+                            <MudSelectItem T="int?" Value="@((int?)match.AwayTeamId)">@match.AwayTeam.Name</MudSelectItem>
+                        </MudSelect>
+
+                        <small>The selection is used when you fill the next round.</small>
+                    </div>
+                }
             </div>
         }
     </section>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Rules">
+    <section class="glass-card panel admin-tab-panel">
+        <h2>Rules page</h2>
+
+        <MudTextField T="string"
+                      Value="_rulesText"
+                      ValueChanged="value => _rulesText = value ?? string.Empty"
+                      Label="Rules text"
+                      Variant="Variant.Outlined"
+                      Lines="12"
+                      FullWidth="true"
+                      Class="rules-admin-editor" />
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Disabled="_isSavingRules"
+                   Class="mt-4"
+                   OnClick="SaveRulesText">
+            @(_isSavingRules ? "Saving..." : "Save rules")
+        </MudButton>
+    </section>
+    </MudTabPanel>
+    </MudTabs>
 }
 
 @code {
     private Participant? _user;
-    private AppSettings? _settings;
+    private bool _predictionsLocked;
     private bool _isUpdatingLock;
     private bool _isImportingTips;
     private bool _isFetchingResults;
     private bool _isApplyingResults;
+    private bool _isFillingKnockout;
+    private bool _isSavingRules;
+    private string _rulesText = AdminService.DefaultRulesText;
+    private string? _loadError;
     private string? _lastImportMessage;
     private IBrowserFile? _selectedImportFile;
     private ResultSyncPreview? _resultSyncPreview;
     private List<Match> _matches = new();
     private Dictionary<int, int?> _resultHomeGoals = new();
     private Dictionary<int, int?> _resultAwayGoals = new();
+    private Dictionary<int, int?> _advancingTeamIds = new();
     private Dictionary<int, string> _kickoffTexts = new();
     private Dictionary<int, string> _groupNames = new();
     private static readonly string[] StageOptions =
@@ -243,37 +321,50 @@ else
         "Semifinal",
         "Final"
     ];
+    private static readonly (string Source, string Target)[] KnockoutTransitions =
+    [
+        ("Sextondelsfinal", "Åttondelsfinal"),
+        ("Åttondelsfinal", "Kvartsfinal"),
+        ("Kvartsfinal", "Semifinal"),
+        ("Semifinal", "Final")
+    ];
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender)
             return;
 
-        _user = await CurrentUser.GetCurrentUserAsync();
-
-        if (_user is null)
+        try
         {
-            Navigation.NavigateTo("/login");
-            return;
+            _user = await CurrentUser.GetCurrentUserAsync();
+
+            if (_user is null)
+            {
+                Navigation.NavigateTo("/login");
+                return;
+            }
+
+            _predictionsLocked = await AdminService.GetPredictionsLockedAsync();
+            _rulesText = await AdminService.GetRulesTextAsync();
+            await ReloadMatchesAsync();
         }
-
-        _settings = await AdminService.GetSettingsAsync();
-        await ReloadMatchesAsync();
-
-        StateHasChanged();
+        catch (Exception ex)
+        {
+            _loadError = ex.Message;
+        }
+        finally
+        {
+            StateHasChanged();
+        }
     }
 
     private async Task TogglePredictionsLock()
     {
-        if (_settings is null)
-            return;
-
         _isUpdatingLock = true;
 
-        var newValue = !_settings.PredictionsLocked;
-        await AdminService.SetPredictionsLockedAsync(newValue);
+        var newValue = !_predictionsLocked;
+        _predictionsLocked = await AdminService.SetPredictionsLockedAsync(newValue);
 
-        _settings.PredictionsLocked = newValue;
         _isUpdatingLock = false;
     }
 
@@ -293,6 +384,30 @@ else
         catch (Exception ex)
         {
             Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task FillNextRound(string sourceStage, string targetStage)
+    {
+        try
+        {
+            _isFillingKnockout = true;
+            StateHasChanged();
+
+            var updates = await PredictionService.FillNextKnockoutRoundAsync(sourceStage, targetStage, _advancingTeamIds);
+
+            await ReloadMatchesAsync();
+
+            Snackbar.Add($"{targetStage} updated with {updates} team slots", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _isFillingKnockout = false;
+            StateHasChanged();
         }
     }
 
@@ -391,6 +506,28 @@ else
         }
     }
 
+    private async Task SaveRulesText()
+    {
+        try
+        {
+            _isSavingRules = true;
+            StateHasChanged();
+
+            _rulesText = await AdminService.SetRulesTextAsync(_rulesText);
+
+            Snackbar.Add("Rules saved", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _isSavingRules = false;
+            StateHasChanged();
+        }
+    }
+
     private string KickoffText(int matchId)
     {
         return _kickoffTexts.TryGetValue(matchId, out var value)
@@ -410,6 +547,39 @@ else
         return _groupNames.TryGetValue(matchId, out var value)
             ? value
             : string.Empty;
+    }
+
+    private int? AdvancingTeamValue(int matchId)
+    {
+        return _advancingTeamIds.TryGetValue(matchId, out var value)
+            ? value
+            : null;
+    }
+
+    private static bool NeedsAdvancingTeam(Match match)
+    {
+        return IsKnockoutStage(match.GroupName)
+            && match.HomeGoals is not null
+            && match.AwayGoals is not null
+            && match.HomeGoals == match.AwayGoals;
+    }
+
+    private static bool IsKnockoutStage(string groupName)
+    {
+        var value = groupName.Trim().ToLowerInvariant();
+
+        return value.Contains("sextondel")
+            || value.Contains("round of 32")
+            || value.Contains("last 32")
+            || value.Contains("åtton")
+            || value.Contains("atton")
+            || value.Contains("round of 16")
+            || value.Contains("last 16")
+            || value.Contains("kvart")
+            || value.Contains("quarter")
+            || value.Contains("semi")
+            || value == "final"
+            || value.Contains(" final");
     }
 
     private void OnImportFileSelected(InputFileChangeEventArgs args)
@@ -464,6 +634,7 @@ else
         {
             _resultHomeGoals[match.Id] = match.HomeGoals;
             _resultAwayGoals[match.Id] = match.AwayGoals;
+            _advancingTeamIds.TryAdd(match.Id, null);
             _kickoffTexts[match.Id] = match.KickoffUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
             _groupNames[match.Id] = match.GroupName;
         }

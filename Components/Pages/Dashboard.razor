@@ -56,6 +56,7 @@ else
                     <span>@row.Rank</span>
                     <strong>@row.ParticipantName</strong>
                     <span>@row.Points pts</span>
+                    <span class="leaderboard-form @FormClass(row.RankChange)">@FormText(row.RankChange)</span>
                 </div>
             }
         </section>
@@ -101,6 +102,26 @@ else
     }
 
     private static string TeamShortName(Team team) => team.Code.Length is >= 3 ? team.Code[..3].ToUpperInvariant() : team.Name;
+
+    private static string FormText(int rankChange)
+    {
+        return rankChange switch
+        {
+            > 0 => $"▲ +{rankChange}",
+            < 0 => $"▼ {rankChange}",
+            _ => "–"
+        };
+    }
+
+    private static string FormClass(int rankChange)
+    {
+        return rankChange switch
+        {
+            > 0 => "up",
+            < 0 => "down",
+            _ => "same"
+        };
+    }
 
 protected override async Task OnAfterRenderAsync(bool firstRender)
 {

@@ -21,7 +21,14 @@ else
         </div>
     </div>
 
-    @if (_settings?.PredictionsLocked == true)
+    @if (!string.IsNullOrWhiteSpace(_loadError))
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">
+            @_loadError
+        </MudAlert>
+    }
+
+    @if (_predictionsLocked)
     {
         <MudAlert Severity="Severity.Warning" Class="mb-4">
             Predictions are currently locked by admin.
@@ -129,7 +136,8 @@ else
 }
 
 @code {
-    private AppSettings? _settings;
+    private bool _predictionsLocked;
+    private string? _loadError;
     private Participant? _user;
     private List<Match> _matches = new();
     private Dictionary<int, PredictionEditModel> _edits = new();
@@ -139,25 +147,34 @@ else
         if (!firstRender)
             return;
 
-        _user = await CurrentUser.GetCurrentUserAsync();
-
-        if (_user is null)
+        try
         {
-            Navigation.NavigateTo("/login");
-            return;
+            _user = await CurrentUser.GetCurrentUserAsync();
+
+            if (_user is null)
+            {
+                Navigation.NavigateTo("/login");
+                return;
+            }
+
+            _predictionsLocked = await AdminService.GetPredictionsLockedAsync();
+            _matches = await PredictionService.GetMatchesWithPredictionsAsync(_user.Id);
+
+            BuildEditState();
         }
-
-        _settings = await AdminService.GetSettingsAsync();
-        _matches = await PredictionService.GetMatchesWithPredictionsAsync(_user.Id);
-
-        BuildEditState();
-
-        StateHasChanged();
+        catch (Exception ex)
+        {
+            _loadError = ex.Message;
+        }
+        finally
+        {
+            StateHasChanged();
+        }
     }
 
     private bool IsLocked(Match match)
     {
-        return _settings?.PredictionsLocked == true;
+        return _predictionsLocked || HasResult(match);
     }
     private static MarkupString TeamFlagImage(Team team)
     {
@@ -217,9 +234,20 @@ else
         if (_user is null)
             return;
 
-        if (_settings?.PredictionsLocked == true)
+        if (_predictionsLocked)
         {
             Snackbar.Add("Predictions are locked.", Severity.Warning);
+            return;
+        }
+
+        var match = _matches.FirstOrDefault(x => x.Id == matchId);
+
+        if (match is null)
+            return;
+
+        if (HasResult(match))
+        {
+            Snackbar.Add("This match already has a result and can no longer be predicted.", Severity.Warning);
             return;
         }
 
@@ -248,5 +276,10 @@ else
     {
         public int? HomeGoals { get; set; }
         public int? AwayGoals { get; set; }
+    }
+
+    private static bool HasResult(Match match)
+    {
+        return match.HomeGoals is not null && match.AwayGoals is not null;
     }
 }

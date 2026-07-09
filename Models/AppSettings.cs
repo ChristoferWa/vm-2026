@@ -6,4 +6,6 @@ public class AppSettings
 
     // Controls whether participants are allowed to submit or edit predictions.
     public bool PredictionsLocked { get; set; }
+
+    public string RulesText { get; set; } = string.Empty;
 }

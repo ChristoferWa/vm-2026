@@ -59,4 +59,5 @@ public sealed record LeaderboardRow(
     int CorrectScore,
     int CorrectOutcome,
     int PredictionsSubmitted,
+    int RankChange,
     bool IsCurrentUser);

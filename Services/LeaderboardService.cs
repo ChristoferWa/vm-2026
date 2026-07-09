@@ -18,50 +18,15 @@ public sealed class LeaderboardService(AppDbContext db)
             .OrderBy(x => x.DisplayName)
             .ToListAsync();
 
-        var sortedRows = participants
-     .Select(p => new
-     {
-         Participant = p,
-         Score = CalculateParticipantScore(p)
-     })
-     .OrderByDescending(x => x.Score.Points)
-     .ThenByDescending(x => x.Score.CorrectScore)
-     .ThenByDescending(x => x.Score.CorrectOutcome)
-     .ThenBy(x => x.Participant.DisplayName)
-     .ToList();
+        var previousRanks = BuildRankLookup(
+            participants,
+            match => match.KickoffUtc.Date < TodayInSweden);
 
-        var leaderboardRows = new List<LeaderboardRow>();
-
-        for (var i = 0; i < sortedRows.Count; i++)
-        {
-            var current = sortedRows[i];
-
-            var rank = i + 1;
-
-            if (i > 0)
-            {
-                var previous = sortedRows[i - 1];
-
-                var sameRank =
-                    current.Score.Points == previous.Score.Points &&
-                    current.Score.CorrectScore == previous.Score.CorrectScore &&
-                    current.Score.CorrectOutcome == previous.Score.CorrectOutcome;
-
-                if (sameRank)
-                    rank = leaderboardRows[i - 1].Rank;
-            }
-
-            leaderboardRows.Add(new LeaderboardRow(
-                rank,
-                current.Participant.DisplayName,
-                current.Score.Points,
-                current.Score.CorrectScore,
-                current.Score.CorrectOutcome,
-                current.Score.PredictionsSubmitted,
-                current.Participant.Id == currentParticipantId));
-        }
-
-        return leaderboardRows;
+        return BuildLeaderboardRows(
+            participants,
+            currentParticipantId,
+            match => true,
+            previousRanks);
     }
     public static int CalculatePredictionPoints(Prediction prediction, Match match)
     {
@@ -91,7 +56,77 @@ public sealed class LeaderboardService(AppDbContext db)
 
         return (goalPoints, outcomePoints, goalPoints + outcomePoints);
     }
-    private static (int Points, int CorrectScore, int CorrectOutcome, int PredictionsSubmitted) CalculateParticipantScore(Participant participant)
+    private static List<LeaderboardRow> BuildLeaderboardRows(
+        List<Participant> participants,
+        int? currentParticipantId,
+        Func<Match, bool> includeMatch,
+        IReadOnlyDictionary<int, int> previousRanks)
+    {
+        var sortedRows = participants
+            .Select(p => new
+            {
+                Participant = p,
+                Score = CalculateParticipantScore(p, includeMatch)
+            })
+            .OrderByDescending(x => x.Score.Points)
+            .ThenByDescending(x => x.Score.CorrectScore)
+            .ThenByDescending(x => x.Score.CorrectOutcome)
+            .ThenBy(x => x.Participant.DisplayName)
+            .ToList();
+
+        var leaderboardRows = new List<LeaderboardRow>();
+
+        for (var i = 0; i < sortedRows.Count; i++)
+        {
+            var current = sortedRows[i];
+            var rank = i + 1;
+
+            if (i > 0)
+            {
+                var previous = sortedRows[i - 1];
+
+                var sameRank =
+                    current.Score.Points == previous.Score.Points &&
+                    current.Score.CorrectScore == previous.Score.CorrectScore &&
+                    current.Score.CorrectOutcome == previous.Score.CorrectOutcome;
+
+                if (sameRank)
+                    rank = leaderboardRows[i - 1].Rank;
+            }
+
+            previousRanks.TryGetValue(current.Participant.Id, out var previousRank);
+            var rankChange = previousRank == 0 ? 0 : previousRank - rank;
+
+            leaderboardRows.Add(new LeaderboardRow(
+                rank,
+                current.Participant.DisplayName,
+                current.Score.Points,
+                current.Score.CorrectScore,
+                current.Score.CorrectOutcome,
+                current.Score.PredictionsSubmitted,
+                rankChange,
+                current.Participant.Id == currentParticipantId));
+        }
+
+        return leaderboardRows;
+    }
+
+    private static Dictionary<int, int> BuildRankLookup(List<Participant> participants, Func<Match, bool> includeMatch)
+    {
+        return BuildLeaderboardRows(participants, null, includeMatch, new Dictionary<int, int>())
+            .Zip(
+                participants
+                    .OrderByDescending(p => CalculateParticipantScore(p, includeMatch).Points)
+                    .ThenByDescending(p => CalculateParticipantScore(p, includeMatch).CorrectScore)
+                    .ThenByDescending(p => CalculateParticipantScore(p, includeMatch).CorrectOutcome)
+                    .ThenBy(p => p.DisplayName),
+                (row, participant) => new { participant.Id, row.Rank })
+            .ToDictionary(x => x.Id, x => x.Rank);
+    }
+
+    private static (int Points, int CorrectScore, int CorrectOutcome, int PredictionsSubmitted) CalculateParticipantScore(
+        Participant participant,
+        Func<Match, bool> includeMatch)
     {
         var points = 0;
         var correctScore = 0;
@@ -106,6 +141,9 @@ public sealed class LeaderboardService(AppDbContext db)
             predictionsSubmitted++;
 
             var match = prediction.Match;
+
+            if (!includeMatch(match))
+                continue;
 
             if (match.HomeGoals is null || match.AwayGoals is null)
                 continue;
@@ -127,6 +165,24 @@ public sealed class LeaderboardService(AppDbContext db)
         }
 
         return (points, correctScore, correctOutcome, predictionsSubmitted);
+    }
+
+    private static DateTime TodayInSweden => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, SwedishTimeZone).Date;
+
+    private static TimeZoneInfo SwedishTimeZone => _swedishTimeZone ??= GetSwedishTimeZone();
+
+    private static TimeZoneInfo? _swedishTimeZone;
+
+    private static TimeZoneInfo GetSwedishTimeZone()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("W. Europe Standard Time");
+        }
     }
 
     private static int GetOutcome(int homeGoals, int awayGoals)

@@ -33,6 +33,10 @@ namespace VmTips.Web.Migrations
                     b.Property<bool>("PredictionsLocked")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("RulesText")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.HasKey("Id");
 
                     b.ToTable("AppSettings");
